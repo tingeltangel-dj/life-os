@@ -99,6 +99,40 @@
   /* ---------- Google-Login ---------- */
   let tok = LS.get('tok', null);
   const hasTok = () => !!(tok && tok.exp > Date.now() + 60000);
+  /* Anmeldung per Weiterleitung (kein Popup): nötig fürs Mac-Widget, klappt überall außer im iPhone-Home-Bildschirm-Modus */
+  const IOS_APP = /iP(hone|ad|od)/.test(navigator.userAgent) && navigator.standalone === true;
+  const RURI = location.origin + location.pathname.replace(/index\.html$/, '');
+  function saveEmail() {
+    if (!tok) return;
+    fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + tok.t } })
+      .then(r => r.ok ? r.json() : null).then(u => { if (u && u.email) LS.set('email', u.email) }).catch(() => { });
+  }
+  (function backFromGoogle() {
+    const raw = location.hash || '';
+    if (raw.indexOf('access_token=') < 0 && raw.indexOf('error=') < 0) return;
+    const h = new URLSearchParams(raw.slice(1)), ok = !!h.get('state') && h.get('state') === LS.get('ost', null);
+    LS.del('ost');
+    if (ok && h.get('access_token')) {
+      tok = { t: h.get('access_token'), exp: Date.now() + (+h.get('expires_in') || 3600) * 1000 }; LS.set('tok', tok); LS.del('sfail'); saveEmail();
+    } else LS.set('sfail', Date.now());
+    const back = LS.get('ohash', ''); LS.del('ohash');
+    history.replaceState(null, '', location.pathname + location.search + (back || ''));
+  })();
+  function redirectLogin(silent) {
+    const st = Math.random().toString(36).slice(2) + Date.now().toString(36); LS.set('ost', st);
+    LS.set('ohash', /^#[a-z]+$/.test(location.hash) ? location.hash : '');
+    const p = new URLSearchParams({ client_id: CFG.clientId, redirect_uri: RURI, response_type: 'token', scope: CFG.scopes, include_granted_scopes: 'true', state: st });
+    const em = LS.get('email', ''); if (em) p.set('login_hint', em);
+    if (silent) p.set('prompt', 'none'); else if (!em) p.set('prompt', 'consent');
+    location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + p.toString());
+  }
+  /* Beim Start still neu anmelden, wenn die Stunde abgelaufen ist (ohne Fenster, nur kurze Weiterleitung) */
+  function trySilent() {
+    if (IOS_APP || !CFG.clientId || hasTok() || !navigator.onLine) return false;
+    if (!tok && !LS.get('email', '')) return false;               // noch nie verbunden → normaler Start
+    if (Date.now() - LS.get('sfail', 0) < 10 * 60000) return false; // gerade erst fehlgeschlagen → nicht im Kreis drehen
+    redirectLogin(true); return true;
+  }
   function gis() {
     return new Promise(res => {
       if (window.google && google.accounts && google.accounts.oauth2) return res(true);
@@ -108,13 +142,14 @@
   }
   async function login() {
     if (!CFG.clientId) throw new Error('Noch keine Google-Client-ID eingetragen (config.js)');
+    if (!IOS_APP) { LS.del('sfail'); redirectLogin(false); return new Promise(() => { }) }
     if (!(await gis()) || !window.google) throw new Error('Google-Login gerade nicht erreichbar');
     return new Promise((res, rej) => {
       const tc = google.accounts.oauth2.initTokenClient({
         client_id: CFG.clientId, scope: CFG.scopes, login_hint: LS.get('email', '') || undefined,
         callback: r => {
           if (r.error) return rej(new Error(r.error_description || r.error));
-          tok = { t: r.access_token, exp: Date.now() + (+r.expires_in || 3600) * 1000 }; LS.set('tok', tok); res(tok);
+          tok = { t: r.access_token, exp: Date.now() + (+r.expires_in || 3600) * 1000 }; LS.set('tok', tok); saveEmail(); res(tok);
         },
         error_callback: e => rej(new Error(e && e.type === 'popup_closed' ? 'Anmeldefenster geschlossen' : 'Anmeldung abgebrochen'))
       });
@@ -378,7 +413,7 @@
 
   window.LOS = {
     cfg: CFG, data: LS.get('data', null), hooks: null, started: false,
-    changed, sync, login, logout, badge, panel, gmailMarkRead, queueRead, setStatus,
+    changed, sync, login, trySilent, logout, badge, panel, gmailMarkRead, queueRead, setStatus,
     _merge3: merge3, _eq: eq, hasTok
   };
 })();
