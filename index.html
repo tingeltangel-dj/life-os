@@ -182,10 +182,17 @@ body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bot
   if(LOS.data){start();return}
   var g=document.getElementById('gate'),m=document.getElementById('gmsg');g.style.display='flex';
   if(!LOS.cfg.clientId)m.textContent='Noch nicht eingerichtet: In config.js fehlt die Google-Client-ID.';
-  document.getElementById('gbtn').onclick=async function(){m.textContent='Verbinde …';
-    try{await LOS.login();m.textContent='Hole Daten aus dem Vault …';await LOS.sync();
+  /* Daten holen – auch direkt nach der Rückkehr von Google (Weiterleitungs-Login), ohne nochmal klicken zu müssen */
+  async function fetchData(){m.textContent='Hole Daten aus dem Vault …';
+    try{await LOS.sync();
       if(LOS.data)start();else m.textContent=({vault:'Der Kevin-Vault liegt noch nicht in „Meine Ablage“ – bitte zuerst verschieben.',err:'Im Vault fehlt noch die Datei Life OS/life-os.json – sag Claude Bescheid.'})[document.body.dataset.st]||'Im Vault liegt noch keine Life-OS-Datei – sag Claude Bescheid.'}
+    catch(e){m.textContent=e.message||'Abgleich fehlgeschlagen'}}
+  document.getElementById('gbtn').onclick=async function(){
+    if(LOS.hasTok&&LOS.hasTok())return fetchData();
+    m.textContent='Verbinde …';
+    try{await LOS.login();await fetchData()}
     catch(e){m.textContent=e.message||'Anmeldung fehlgeschlagen'}};
+  if(LOS.cfg.clientId&&LOS.hasTok&&LOS.hasTok())fetchData();
 })();
 </script>
 </body></html>
