@@ -114,7 +114,7 @@
     LS.del('ost');
     if (ok && h.get('access_token')) {
       tok = { t: h.get('access_token'), exp: Date.now() + (+h.get('expires_in') || 3600) * 1000 }; LS.set('tok', tok); LS.del('sfail'); saveEmail();
-    } else LS.set('sfail', Date.now());
+    } else { LS.set('sfail', Date.now()); LS.set('serr', h.get('error') || 'state') }
     const back = LS.get('ohash', ''); LS.del('ohash');
     history.replaceState(null, '', location.pathname + location.search + (back || ''));
   })();
