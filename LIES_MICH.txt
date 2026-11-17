@@ -1,0 +1,20 @@
+KEVINS LIFE OS – EIGENSTÄNDIGE APP (Stand 17.11.2026)
+====================================================
+
+Das ist das Life OS als normale Website, die man auf dem Handy und am PC
+wie eine App installieren kann. Alles, was du dort einträgst, landet im
+Kevin-Vault (Google Drive → Meine Ablage → Kevin-Vault → Life OS).
+
+Dateien:
+- index.html, app.js, sync.js ... die App selbst (enthält KEINE persönlichen Daten)
+- config.js ..................... hier kommt die Google-Client-ID rein
+- manifest.webmanifest, sw.js ... damit man sie installieren kann und sie offline läuft
+- icon-*.png .................... App-Symbol
+
+Deine Daten liegen NICHT hier, sondern im Vault:
+Kevin-Vault\Life OS\life-os.json  (+ lesbare Notizen für Obsidian, die die App schreibt)
+
+In Obsidian: Kevin-Vault › Life OS › Eingang  – dort einfach Zeilen mit "- " schreiben,
+die App sortiert sie beim nächsten Abgleich als To-do / Termin / Idee ein.
+
+Die Website wird über GitHub Pages veröffentlicht. Claude spielt neue Versionen ein.
