@@ -73,6 +73,8 @@ const PRESETS={
  'Gold Night':{cy:'#e6c273',cy2:'#e6c273',amb:'#4db7df',br:'#4a4636',line:'#2a2a24',panel:'#12120f',bg:'#080806',item:'#191813'},
  'Matrix':{cy:'#4fd18b',cy2:'#9fe0b5',amb:'#c8f06a',br:'#2f4a3a',line:'#173022',panel:'#0b1510',bg:'#030805',item:'#0f1d15',ok:'#4fd18b'},
  'Sunset':{cy:'#ff8a5c',cy2:'#f3b27a',amb:'#ffd36b',br:'#4d3a36',line:'#2b201e',panel:'#161012',bg:'#0a0607',item:'#1d1517'},
+ 'Neon Mac':{bg:'#05040b',panel:'#0c0917',item:'#130e22',line:'#231a3b',br:'#4b3a75',tx:'#f1ecfc',mu:'#8579a3',cy:'#c46bff',cy2:'#8f7dff',amb:'#ff5fcf',ok:'#5fd6c0',p1:'#ff5f9e',p2:'#b49cff',p3:'#7d93ff',
+  hub:{musik:'#ff4fa8',projekte:'#9a7bff',finanzen:'#5fd6c0',todos:'#ff8bdc',kalender:'#6f86ff',leben:'#c46bff',warten:'#e6a0ff'}},
  'Ice':{cy:'#9fd8ff',cy2:'#c7e6f5',amb:'#ffffff',br:'#41505c',line:'#1f2a33',panel:'#0d141a',bg:'#05090d',item:'#131c24'}};
 const TH=()=>{const t=D.theme||{};return Object.assign({},DEF,t,{hub:Object.assign({},DEF.hub,t.hub||{})})};
 function rgb(c){const n=parseInt(c.slice(1),16);return `${n>>16},${n>>8&255},${n&255}`}

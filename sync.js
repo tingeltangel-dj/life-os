@@ -293,7 +293,8 @@
 
   /* ---------- Abgleich ---------- */
   let state = 'idle', detail = '', syncing = false, again = false, tmr = null, pending = null;
-  function setStatus(s, d) { state = s; detail = d || ''; try { document.body.dataset.st = s } catch (e) { } const b = document.getElementById('cld'); if (b) b.innerHTML = badge(); const p = document.getElementById('losp'); if (p) LOS.panel(true) }
+  function setStatus(s, d) { state = s; detail = d || ''; try { document.body.dataset.st = s } catch (e) { } const b = document.getElementById('cld'); if (b) b.innerHTML = badge(); if (panelOpen()) LOS.panel(true) }
+  function panelOpen() { const p = document.getElementById('losp'), ov = document.getElementById('ov'); return !!(p && ov && ov.classList.contains('on')) }
   function badge() {
     const t = LS.get('last', 0), hm = t ? new Date(t).toTimeString().slice(0, 5) : '';
     return ({ ok: '☁ ✓ ' + hm, sync: '☁ …', login: '☁ Verbinden', offline: '☁ Offline', err: '☁ ⚠', vault: '☁ ⚠ Vault', nocfg: '☁ Einrichten', idle: '☁' })[state] || '☁';
@@ -368,7 +369,7 @@
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   function panel(refresh) {
     const H = LOS.hooks; if (!H || !H.sheet) return;
-    if (refresh && !document.getElementById('losp')) return;
+    if (refresh && !panelOpen()) return; // nur auffrischen, wenn das Fenster gerade offen ist – sonst nie von selbst öffnen
     const t = LS.get('last', 0), when = t ? new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'noch nie';
     const txt = ({
       ok: 'Verbunden mit deinem Vault in Google Drive.',
