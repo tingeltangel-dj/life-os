@@ -264,6 +264,28 @@
     }
     return n;
   }
+  /* Abhaken aus der Cloud: Dateien „Abgehakt JJJJ-MM-TT….md“ mit Zeilen „- [x] genauer To-do-Text“.
+     Hakt nur ab, wenn genau EIN offenes, nicht wiederkehrendes To-do diesen Text hat. */
+  async function cloudTicks(m) {
+    const fs = (await find(`name contains 'Abgehakt' and '${m.folder}' in parents and trashed=false`)).filter(f => /^Abgehakt \d{4}-\d{2}-\d{2}.*\.md$/.test(f.name));
+    let n = 0;
+    for (const f of fs) {
+      const lines = (await download(f.id)).split(/\r?\n/).map(s => (s.match(/^\s*[-*+]\s+\[[xX]\]\s*(.+?)\s*$/) || [])[1]).filter(Boolean);
+      if (!lines.length || !LOS.data || !LOS.data.todos) continue;
+      await api(DA + '/' + f.id + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: J({ name: 'Erledigt – ' + f.name }) });
+      const d = new Date(), p = x => String(x).padStart(2, '0'), today = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+      const ok = [], no = [], norm = s => s.replace(/\\/g, '').replace(/\s+/g, ' ').trim(); // Google Drive setzt manchmal Schrägstriche dazu
+      for (const t of lines) {
+        const hit = LOS.data.todos.filter(x => !x.done && !x.rep && norm(x.t) === norm(t));
+        if (hit.length === 1) { hit[0].done = true; hit[0].at = today; ok.push(t) } else no.push(t);
+      }
+      n += ok.length;
+      if (ok.length) logEntry('Von Claude abgehakt: ' + ok.join(' · '));
+      if (no.length) logEntry('Abhaken nicht möglich (nicht eindeutig gefunden): ' + no.join(' · '));
+      LS.set('data', clean(LOS.data));
+    }
+    return n;
+  }
   function logEntry(text) {
     const D = LOS.data; if (!D) return; D.log = D.log || [];
     const n = new Date(), p = x => String(x).padStart(2, '0');
@@ -360,6 +382,7 @@
         try { await flushRead() } catch (e) { }
         try { ch = (await inbox(m)) > 0 || ch } catch (e) { console.warn('Eingang', e) }
         try { ch = (await cloudInbox(m)) > 0 || ch } catch (e) { console.warn('Cloud-Eingang', e) }
+        try { ch = (await cloudTicks(m)) > 0 || ch } catch (e) { console.warn('Abhaken', e) }
         try { ch = (await pullMails(opts.mails)) || ch } catch (e) { console.warn('Gmail', e) }
         if (ch) { LS.set('data', clean(LOS.data)); if (LOS.hooks && LOS.hooks.render && !(LOS.hooks.busy && LOS.hooks.busy())) LOS.hooks.render(); again = true }
         try { await writeNotes(m) } catch (e) { console.warn('Notizen', e) }
