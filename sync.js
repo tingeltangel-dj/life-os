@@ -248,6 +248,22 @@
     }
     LS.set('inboxMod', me.modifiedTime); return 0;
   }
+  /* Cloud-Eingang: Dateien „Eingang JJJJ-MM-TT….md“, die Claude nachts ohne PC/Mac in den Ordner legt.
+     Erst umbenennen (= „hab ich“), dann eintragen – so holt kein zweites Gerät dieselbe Datei nochmal. Gelöscht wird nichts. */
+  async function cloudInbox(m) {
+    const fs = (await find(`name contains 'Eingang' and '${m.folder}' in parents and trashed=false`)).filter(f => /^Eingang \d{4}-\d{2}-\d{2}.*\.md$/.test(f.name));
+    let n = 0;
+    for (const f of fs) {
+      const txt = await download(f.id);
+      const lines = txt.split(/\r?\n/).map(s => (s.match(/^\s*[-*+]\s+(?:\[[ xX]\]\s*)?(.+?)\s*$/) || [])[1]).filter(Boolean);
+      if (!lines.length || !LOS.hooks || !LOS.hooks.capture) continue;
+      await api(DA + '/' + f.id + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: J({ name: 'Erledigt – ' + f.name }) });
+      lines.forEach(t => LOS.hooks.capture(t)); n += lines.length;
+      logEntry('Aus Cloud-Eingang übernommen: ' + lines.join(' · '));
+      LS.set('data', clean(LOS.data));
+    }
+    return n;
+  }
   function logEntry(text) {
     const D = LOS.data; if (!D) return; D.log = D.log || [];
     const n = new Date(), p = x => String(x).padStart(2, '0');
@@ -343,6 +359,7 @@
         let ch = false;
         try { await flushRead() } catch (e) { }
         try { ch = (await inbox(m)) > 0 || ch } catch (e) { console.warn('Eingang', e) }
+        try { ch = (await cloudInbox(m)) > 0 || ch } catch (e) { console.warn('Cloud-Eingang', e) }
         try { ch = (await pullMails(opts.mails)) || ch } catch (e) { console.warn('Gmail', e) }
         if (ch) { LS.set('data', clean(LOS.data)); if (LOS.hooks && LOS.hooks.render && !(LOS.hooks.busy && LOS.hooks.busy())) LOS.hooks.render(); again = true }
         try { await writeNotes(m) } catch (e) { console.warn('Notizen', e) }
