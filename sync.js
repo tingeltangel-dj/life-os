@@ -53,11 +53,30 @@
     if (out && typeof out === 'object') out.next = Math.max(out.next || 0, ctx.next, maxId(out) + 1);
     return out;
   }
+  /* Doppelte Nummern in einer Liste auflösen. Sonst gilt die ganze Liste als „nicht zuordenbar“ und das Gerät überschreibt die andere Seite.
+     Gleicher Eintrag (Nummer + Text) bekommt in allen drei Ständen dieselbe neue Nummer. */
+  function undup(arrs, ctx) {
+    const ik = x => x && typeof x === 'object' && typeof x.id === 'number' ? J([x.id, x.t || x.n || x.name || x.who || '']) : null;
+    const ren = new Map(); let hit = false;
+    for (const a of arrs) if (Array.isArray(a)) {
+      const seen = new Map();
+      for (const x of a) { const k = ik(x); if (!k) continue; if (!seen.has(x.id)) seen.set(x.id, k); else { hit = true; if (seen.get(x.id) !== k) ren.set(k, 0) } }
+    }
+    if (!hit) return arrs;
+    for (const k of ren.keys()) ren.set(k, ctx.next++);
+    return arrs.map(a => {
+      if (!Array.isArray(a)) return a;
+      const done = new Set();
+      return a.filter(x => { const k = ik(x); if (!k) return true; if (done.has(k)) return false; done.add(k); return true })
+        .map(x => { const k = ik(x); return k && ren.has(k) ? Object.assign(copy(x), { id: ren.get(k) }) : x });
+    });
+  }
   function m3(b, l, r, key, ctx) {
     if (eq(l, r)) return l;
     if (b !== undefined && eq(b, l)) return r;
     if (b !== undefined && eq(b, r)) return l;
     if (key === 'next' && typeof l === 'number' && typeof r === 'number') return Math.max(l, r);
+    if (Array.isArray(l) && Array.isArray(r)) [b, l, r] = undup([b, l, r], ctx);
     if (keyed(l) && keyed(r)) {
       const bb = keyed(b) ? b : [];
       const B = new Map(bb.map(x => [keyOf(x), x])), L = new Map(l.map(x => [keyOf(x), x])), R = new Map(r.map(x => [keyOf(x), x]));
