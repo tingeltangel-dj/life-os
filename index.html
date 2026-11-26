@@ -284,13 +284,13 @@ input,select,textarea{font-family:var(--sans);border-radius:10px;background:var(
 <div id="gate" style="display:none"><div class="box"><img src="icon-192.png" alt=""><h1>Life <em>OS</em></h1>
 <p>Melde dich mit deinem Google-Konto an. Danach holt die App alles aus deinem Kevin-Vault und hält es dort aktuell.</p>
 <button id="gbtn">Mit Google verbinden</button><small id="gmsg"></small></div></div>
-<script src="config.js?v=8"></script>
-<script src="sync.js?v=8"></script>
+<script src="config.js?v=9"></script>
+<script src="sync.js?v=9"></script>
 <script>
 (function(){
   if('serviceWorker' in navigator) addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
   function start(){if(LOS.started)return;LOS.started=true;document.getElementById('gate').style.display='none';
-    var s=document.createElement('script');s.src="app.js?v=8";s.onload=function(){Promise.resolve(LOS.sync({mails:true})).catch(function(){}).finally(function(){window.migrateSkin&&migrateSkin()})};document.body.appendChild(s)}
+    var s=document.createElement('script');s.src="app.js?v=9";s.onload=function(){Promise.resolve(LOS.sync({mails:true})).catch(function(){}).finally(function(){window.migrateSkin&&migrateSkin()})};document.body.appendChild(s)}
   if(LOS.trySilent&&LOS.trySilent())return;
   if(LOS.data){start();return}
   var g=document.getElementById('gate'),m=document.getElementById('gmsg');g.style.display='flex';

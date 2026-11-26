@@ -280,7 +280,7 @@ function bindNexus(){const cv=$('nexus');if(!cv)return;G.hover=null;G.dirty=true
   G.tap=e.type=='pointerup'&&D0&&!G.moved;if(D0&&D0.n&&G.moved)G.alpha=Math.max(G.alpha,.25)};
  cv.onclick=e=>{if(!G.tap)return;G.tap=false;const[mx,my]=pos(e);nxClick(nxHit(mx,my))};
  cv.onpointerup=up;cv.onpointercancel=up;cv.onpointerleave=e=>{if(e.pointerType=='mouse'&&!G.drag){G.hover=null;G.dirty=true}};
- cv.onwheel=e=>{G.wheelT=performance.now();if(G.hover){G.hover=null;G.dirty=true}const f=Math.exp(-Math.max(-160,Math.min(160,e.deltaY))*(e.ctrlKey?.008:.0011)),k=G.zt?G.zt.k:G.cam.k;if((f>1&&k>=KMAX()*.999)||(f<1&&k<=G.fitK*.7*1.001))return;e.preventDefault();const[mx,my]=pos(e),[wx,wy]=toW(mx,my);G.tgt=null;G.zt={k:Math.max(G.fitK*.7,Math.min(KMAX(),k*f)),ax:mx,ay:my,wx,wy};G.dirty=true};
+ cv.onwheel=e=>{G.wheelT=performance.now();if(G.hover){G.hover=null;G.dirty=true}const f=Math.exp(-Math.max(-160,Math.min(160,e.deltaY))*(e.ctrlKey?.008:.0011)),k=G.zt?G.zt.k:G.cam.k;e.preventDefault();if((f>1&&k>=KMAX()*.999)||(f<1&&k<=G.fitK*.7*1.001))return;const[mx,my]=pos(e),[wx,wy]=toW(mx,my);G.tgt=null;G.zt={k:Math.max(G.fitK*.7,Math.min(KMAX(),k*f)),ax:mx,ay:my,wx,wy};G.dirty=true};
  cv.ondblclick=e=>{const[mx,my]=pos(e);if(!nxHit(mx,my)){const h=nxFit();nxGo(h.x,h.y,h.k)}};
  document.querySelectorAll('[data-nz]').forEach(b=>b.onclick=()=>{const z=b.dataset.nz;if(z=='fit'){const h=nxFit();nxGo(h.x,h.y,h.k)}else{const f=z=='in'?1.4:1/1.4;nxGo(G.cam.x,G.cam.y,G.cam.k*f)}});
 }
