@@ -268,7 +268,7 @@ function bindNexus(){const cv=$('nexus');if(!cv)return;G.hover=null;G.dirty=true
  const pos=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
  cv.onpointerdown=e=>{const[mx,my]=pos(e);G.ptr.set(e.pointerId,[mx,my]);try{cv.setPointerCapture(e.pointerId)}catch(_){}
   if(G.ptr.size==2){const[a,b]=[...G.ptr.values()];G.pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]),m:[(a[0]+b[0])/2,(a[1]+b[1])/2]};G.drag=null;G.moved=true;return}
-  G.zt=null;const n=nxHit(mx,my),dn=n&&n.d>0?n:null;G.drag={n:dn,nx:dn?dn.x:null,ny:dn?dn.y:null,sx:mx,sy:my,cx:G.cam.x,cy:G.cam.y};G.moved=false;G.tap=false};
+  G.zt=null;const n=nxHit(mx,my),dn=n&&n.d>0&&e.pointerType=='mouse'?n:null;G.drag={n:dn,nx:dn?dn.x:null,ny:dn?dn.y:null,sx:mx,sy:my,cx:G.cam.x,cy:G.cam.y};G.moved=false;G.tap=false};
  cv.onpointermove=e=>{const[mx,my]=pos(e);if(G.ptr.has(e.pointerId))G.ptr.set(e.pointerId,[mx,my]);
   if(G.pinch&&G.ptr.size==2){const[a,b]=[...G.ptr.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]),m=[(a[0]+b[0])/2,(a[1]+b[1])/2];nxZoomAt(m[0],m[1],d/G.pinch.d);
    G.cam.x-=(m[0]-G.pinch.m[0])/G.cam.k;G.cam.y-=(m[1]-G.pinch.m[1])/G.cam.k;G.pinch={d,m};return}
@@ -430,7 +430,7 @@ function habToday(){return D.habits.map(h=>{const d=habDone(h),ic=(h.t.match(/^\
 function bindStart(){bindTodos();document.querySelectorAll('[data-ht]').forEach(b=>b.onclick=()=>{const L=D.hlog[WK]=D.hlog[WK]||{};const r=L[b.dataset.ht]=L[b.dataset.ht]||[0,0,0,0,0,0,0];r[todayIdx]=r[todayIdx]?0:1;save();refreshSide()})}
 function vStart(){
  const t=ftot(),o=open();
- $('v').innerHTML=`${heutePanel()}<div class="card nx mt"><h2 style="padding:2px 4px 0"><span><i class="ico" style="--c:var(--h-leben)">◈</i>Neural Nexus</span><button id="rev">Wochen-Check-in ↻</button></h2><div class="nxw"><canvas id="nexus"></canvas><div class="nxlvl" id="nxlvl"></div><div class="nxz"><button data-nz="in" title="Reinzoomen">+</button><button data-nz="out" title="Rauszoomen">−</button><button data-nz="fit" title="Alles zeigen">⤢</button></div><div class="nxh">Mausrad / zwei Finger = Zoom · Ziehen = Bewegen · Antippen = Öffnen</div></div></div>
+ $('v').innerHTML=`${heutePanel()}<div class="card nx mt"><h2 style="padding:2px 4px 0"><span><i class="ico" style="--c:var(--h-leben)">◈</i>Neural Nexus</span><button id="rev">Wochen-Check-in ↻</button></h2><div class="nxw"><canvas id="nexus"></canvas><div class="nxlvl" id="nxlvl"></div><div class="nxz"><button data-nz="in" title="Reinzoomen">+</button><button data-nz="out" title="Rauszoomen">−</button><button data-nz="fit" title="Alles zeigen">⤢</button></div><div class="nxh">Mausrad = Zoom · Ziehen = Bewegen · Klicken = Öffnen</div></div></div>
  <div class="card mt"><h2><span><i class="ico" style="--c:var(--h-todos)">✓</i>To-dos</span><span class="r">${o.length} offen · <span style="color:var(--p1)">${o.filter(x=>x.p==1).length} mit hoher Priorität</span></span></h2><div id="tdbox">${todoPanel()}</div></div>
  <div class="grid mt">${tracksPanel()}${waitPanel()}</div>
  <div class="grid mt"><div class="card"><h2><span><i class="ico" style="--c:var(--h-kalender)">▦</i>Als Nächstes</span><a href="#kalender">Kalender →</a></h2>${upcoming(5).map(evRow).join('')}</div>
