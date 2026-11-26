@@ -43,25 +43,51 @@ const fsum=l=>l.filter(active).reduce((a,x)=>a+(+x.b||0),0);
 function ftot(){const F=D.fin,e=fsum(F.einnahmen),a=fsum(F.monat),j=fsum(F.jaehrlich)/12;return{e,a,j,r:e-a-j}}
 let ftab='monat';
 
+const IC={start:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+ todos:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>',
+ kalender:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+ finanzen:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2.5"/><path d="M3 10h18M16 15h2"/></svg>',
+ musik:'<svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+ projekte:'<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
+ design:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor"/></svg>',
+ cloud:'<svg viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 00.5-8 6 6 0 00-11.5 1.5A3.3 3.3 0 007 18z"/></svg>',
+ search:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
+ bolt:'<svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>'};
+const PAGE={todos:['To-dos','Alles Offene nach Priorität – abhaken, bearbeiten, neu eintragen.'],kalender:['Kalender','Termine, Gigs und deine Schichten im Überblick.'],finanzen:['Finanzen','Was reinkommt, was rausgeht – und was im Monat bleibt.'],musik:['Musik','Tingeltangel: Zahlen, Releases und alles rund ums Studio.'],projekte:['Projekte & Ideen','Alles, was wir bauen wollen oder schon bauen.'],ideen:['Projekte & Ideen','Alles, was wir bauen wollen oder schon bauen.']};
 function render(){
  const h=new Date().getHours(),gr=h<5?'Gute Nacht':h<11?'Guten Morgen':h<17?'Hallo':h<22?'Guten Abend':'Gute Nacht';
- const S=SH[shift(T0)]||SH.frei;
+ const st=shift(T0),S=SH[st]||SH.frei,tm=new Date(TODAY);tm.setDate(tm.getDate()+1);const ST=SH[shift(iso(tm))]||SH.frei;
  const nx=D.events.filter(e=>days(e.d)>=0&&e.gig).sort((a,b)=>a.d.localeCompare(b.d))[0];
  const views=[['start','Home'],['todos','To-dos'],['kalender','Kalender'],['finanzen','Finanzen'],['musik','Musik'],['projekte','Projekte']];
- if(!views.some(v=>v[0]==view))view='start';
- const st=shift(T0);
- $('root').innerHTML=`<div class="topbar"><div class="brand"><i></i>LIFE OS <span>// DASHBOARD</span></div>
- <nav>${views.map(v=>`<a href="#${v[0]}" class="${view==v[0]?'on':''}">${v[1]}</a>`).join('')}</nav>
- <div class="status"><span class="${S[1]}">● ${S[0]}</span>${nx?`<span>GIG <b>${esc(nx.t.split(/[,–]/)[0].trim())}</b> · ${days(nx.d)}T</span>`:''}<button class="pill cld" id="cld">${LOS.badge()}</button><button class="pill" id="dsg"><i></i>Design</button></div></div>
- <div class="panel sess"><h2><span><i class="ico">◉</i>// Session</span><span>${WDL[TODAY.getDay()]} · ${pad(TODAY.getDate())}.${pad(TODAY.getMonth()+1)}.${TODAY.getFullYear()}</span></h2>
- <div class="greet">${gr}, <em>Kevin.</em></div>
- ${(view=='projekte'||view=='ideen')?`<div class="quick psrch"><input id="pq" placeholder="🔍 Projekte durchsuchen: Stichwort eintippen, z. B. Ableton …" value="${esc(pq)}" autocomplete="off"><div id="psug" class="psug"></div></div><div class="hint">Sucht live in Namen und Beschreibungen aller Projekte – Vorschlag antippen öffnet das Projekt.</div>`:`<div class="quick"><input id="qi" placeholder="Smart Capture: Termin, To-do, Ziel oder Idee eintippen & Enter …"><button class="btn" id="qb">Capture</button></div><div class="hint" id="qh">Erkennt automatisch, ob es ein Termin, To-do oder eine Idee ist – und legt es im richtigen Bereich ab.</div>`}</div>
- <div id="v" class="mt"></div>`;
- $('dsg').onclick=designSheet;$('cld').onclick=()=>LOS.panel();
- if($('qi')){$('qb').onclick=quick;$('qi').onkeydown=e=>{if(e.key=='Enter')quick()}}
+ if(!views.some(v=>v[0]==view)&&view!='ideen')view='start';
+ const o=open(),hi=o.filter(x=>x.p==1).length,cur=view=='ideen'?'projekte':view,psearch=(view=='projekte'||view=='ideen');
+ const cnt={todos:o.length,projekte:(D.projects||[]).filter(p=>p.st=='läuft').length,kalender:D.events.filter(e=>days(e.d)>=0&&days(e.d)<=7).length};
+ const gigName=nx?esc(nx.t.split(/[,–(]/)[0].trim()):'';
+ const hero=view=='start'?`<section class="hero"><div class="hlab">Heute · ${WDL[TODAY.getDay()]}, ${pad(TODAY.getDate())}.${pad(TODAY.getMonth()+1)}.</div>
+  <h1>${gr}, Kevin.</h1>
+  <p>${S[0]}${S[2]&&S[2]!='frei'?' · '+S[2]:''}. ${o.length} To-dos offen${hi?`, <b>${hi} mit hoher Priorität</b>`:''}.${nx?` Nächster Gig: <b>${gigName}</b> in ${days(nx.d)} Tagen.`:''}</p>
+  <div class="hbtn"><button class="btn w s" id="hcap">＋ Eintragen</button><button class="btn g s" id="hrev">Wochen-Check-in</button></div>
+  <div class="hint" id="qh">Oben ins Feld tippen: Termin, To-do oder Idee – wird automatisch einsortiert.</div></section>`
+  :`<section class="phead"><h1>${PAGE[view][0]}</h1><p>${PAGE[view][1]}</p>${psearch?'':'<div class="hint" id="qh"></div>'}</section>`;
+ $('root').innerHTML=`<aside class="side"><a class="brand" href="#start"><b>LIFE</b> OS<small>Kevin · Tingeltangel</small></a>
+ <nav class="snav">${views.map(v=>`<a href="#${v[0]}" class="${cur==v[0]?'on':''}"><i>${IC[v[0]]}</i>${v[1]}${cnt[v[0]]?`<em>${cnt[v[0]]}</em>`:''}</a>`).join('')}</nav>
+ <div class="sdiv"></div>
+ <nav class="snav"><a href="javascript:void 0" id="sdsg"><i>${IC.design}</i>Design</a><a href="javascript:void 0" id="scld"><i>${IC.cloud}</i>Vault &amp; Sync</a></nav>
+ <div class="scard ${S[1]}" id="sshift"><b><i>${IC.bolt}</i>${esc(S[0])}</b><span><em>Heute</em> · ${esc(S[2])}</span><small>Morgen: ${esc(ST[0])} ›</small></div></aside>
+ <div class="main"><header class="top">
+ ${psearch?`<div class="srch psrch"><i>${IC.search}</i><input id="pq" placeholder="Projekte durchsuchen …" value="${esc(pq)}" autocomplete="off"><kbd>Strg K</kbd><div id="psug" class="psug"></div></div>`
+  :`<div class="srch"><i>${IC.search}</i><input id="qi" placeholder="Eintragen: Termin, To-do oder Idee …" autocomplete="off"><kbd>Strg K</kbd><button class="btn w s" id="qb">Capture</button></div>`}
+ ${nx?`<a class="gpill" href="#kalender" title="${esc(nx.t)}"><i></i><span>${gigName}</span><em>${days(nx.d)} T.</em></a>`:''}
+ <button class="sync" id="cld">${LOS.badge()}</button><button class="ava" id="dsg" title="Design & Farben">KE</button></header>
+ ${hero}<div id="v" class="mt"></div></div>
+ <nav class="tabbar">${views.map(v=>`<a href="#${v[0]}" class="${cur==v[0]?'on':''}"><i>${IC[v[0]]}</i><span>${v[1]}</span></a>`).join('')}</nav>`;
+ $('dsg').onclick=designSheet;$('sdsg').onclick=designSheet;$('cld').onclick=()=>LOS.panel();$('scld').onclick=()=>LOS.panel();$('sshift').onclick=()=>{location.hash='#kalender'};
+ if($('hrev'))$('hrev').onclick=reviewSheet;if($('hcap'))$('hcap').onclick=()=>{$('qi').focus()};
+ if($('qi')){$('qb').onclick=quick;$('qi').onkeydown=e=>{if(e.key=='Enter')quick();if(e.key=='Escape')e.target.blur()}}
  if($('pq')){$('pq').oninput=e=>{pq=e.target.value;projSug()};$('pq').onfocus=projSug;$('pq').onblur=()=>setTimeout(()=>{const bx=$('psug');if(bx)bx.style.display='none'},150);$('pq').onkeydown=e=>{if(e.key=='Escape'){pq='';e.target.value='';projSug();e.target.blur()}}}
  ({start:vStart,todos:vTodos,kalender:vCal,finanzen:vFin,musik:vMusik,projekte:vProj,ideen:vProj})[view]();
 }
+addEventListener('keydown',e=>{if($('ov').classList.contains('on'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){const f=$('qi')||$('pq');if(f){e.preventDefault();f.focus();f.select()}}});
 window.onhashchange=()=>{view=(location.hash||'#start').slice(1);render();window.scrollTo(0,0)};
 
 
@@ -69,6 +95,8 @@ window.onhashchange=()=>{view=(location.hash||'#start').slice(1);render();window
 const DEF={bg:'#040a0e',panel:'#0e161b',item:'#121c22',line:'#1c2a30',br:'#3b4b53',tx:'#e8f1f4',mu:'#5d7178',cy:'#4db7df',cy2:'#87b8a8',amb:'#e6c273',ok:'#4fae6e',p1:'#d97a7a',p2:'#8fd1b4',p3:'#7fb8e6',
  hub:{musik:'#e05a5a',projekte:'#7fd3c4',finanzen:'#4fc28a',todos:'#e8a04a',kalender:'#a98bea',leben:'#4db7df',warten:'#e39ab8'}};
 const PRESETS={
+ 'RONE':{bg:'#0e0e10',panel:'#161618',item:'#1c1c1f',line:'#27272b',br:'#3a3a40',tx:'#f3f3f5',mu:'#74747e',cy:'#33c4ea',cy2:'#ff4f9a',amb:'#f5c84c',ok:'#3ddc84',p1:'#ff5c8a',p2:'#f5c84c',p3:'#33c4ea',
+  hub:{musik:'#ff4f9a',projekte:'#9b7bff',finanzen:'#3ddc84',todos:'#f5c84c',kalender:'#33c4ea',leben:'#2fd4c0',warten:'#ff8a5c'}},
  'Dominik':{},
  'Gold Night':{cy:'#e6c273',cy2:'#e6c273',amb:'#4db7df',br:'#4a4636',line:'#2a2a24',panel:'#12120f',bg:'#080806',item:'#191813'},
  'Matrix':{cy:'#4fd18b',cy2:'#9fe0b5',amb:'#c8f06a',br:'#2f4a3a',line:'#173022',panel:'#0b1510',bg:'#030805',item:'#0f1d15',ok:'#4fd18b'},
@@ -78,7 +106,7 @@ const PRESETS={
  'Ice':{cy:'#9fd8ff',cy2:'#c7e6f5',amb:'#ffffff',br:'#41505c',line:'#1f2a33',panel:'#0d141a',bg:'#05090d',item:'#131c24'}};
 const TH=()=>{const t=D.theme||{};return Object.assign({},DEF,t,{hub:Object.assign({},DEF.hub,t.hub||{})})};
 function rgb(c){const n=parseInt(c.slice(1),16);return `${n>>16},${n>>8&255},${n&255}`}
-function applyTheme(){const t=TH(),s=document.documentElement.style;['bg','panel','item','line','br','tx','mu','cy','cy2','amb','ok','p1','p2','p3'].forEach(k=>s.setProperty('--'+k,t[k]));s.setProperty('--cyRGB',rgb(t.cy));s.setProperty('--red',t.p1);s.setProperty('--ac2',t.p2)}
+function applyTheme(){const t=TH(),s=document.documentElement.style;['bg','panel','item','line','br','tx','mu','cy','cy2','amb','ok','p1','p2','p3'].forEach(k=>s.setProperty('--'+k,t[k]));s.setProperty('--cyRGB',rgb(t.cy));Object.keys(t.hub).forEach(k=>s.setProperty('--h-'+k,t.hub[k]));s.setProperty('--red',t.p1);s.setProperty('--ac2',t.p2)}
 const PC=p=>TH()['p'+p]||TH().p2;
 function hexA(c,a){const n=parseInt(c.slice(1),16);return `rgba(${n>>16},${n>>8&255},${n&255},${a})`}
 const ACOL={musik:'#b3a1f0',lernen:'#7fb8e6',projekte:'#7fd3c4',labor:'#8fd1b4',finanzen:'#e6c273',gesundheit:'#e0a372',ich:'#e39ab8',liebe:'#d97a7a',familie:'#e8b48a',zukunft:'#93a8e8'};
@@ -204,13 +232,13 @@ function designSheet(){const t=TH();
  <div class="sec">Prioritäten</div><div class="cpick">${[['p1','Hoch'],['p2','Mittel'],['p3','Niedrig']].map(([k,l])=>cp(k,l,t[k],`data-k="${k}"`)).join('')}</div>
  <div class="sec">Neural Nexus – Module</div><div class="cpick">${Object.keys(DEF.hub).map(k=>cp(k,k.toUpperCase().replace('TODOS','TO-DOS').replace('WARTEN','WARTE AUF'),t.hub[k],`data-hub="${k}"`)).join('')}</div>
  <div class="sec">Lebensbereiche</div><div class="cpick">${D.areas.map(a=>cp(a.id,a.i+' '+a.n,a.c,`data-area="${a.id}"`)).join('')}</div>
- <button class="btn g" id="rst" style="width:100%;margin-top:16px">Alles auf Dominik-Original zurücksetzen</button>`);
+ <button class="btn g" id="rst" style="width:100%;margin-top:16px">Alles auf RONE-Look zurücksetzen</button>`);
  const set=()=>{applyTheme()};
  document.querySelectorAll('#sh input[type=color]').forEach(inp=>{inp.oninput=()=>{D.theme=D.theme||{};const v=inp.value;
   if(inp.dataset.k)D.theme[inp.dataset.k]=v;else if(inp.dataset.hub){D.theme.hub=D.theme.hub||{};D.theme.hub[inp.dataset.hub]=v}else if(inp.dataset.area)AR(inp.dataset.area).c=v;
   inp.parentNode.querySelector('code').textContent=v.toUpperCase();set()};inp.onchange=()=>save()});
  document.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{D.theme=JSON.parse(JSON.stringify(PRESETS[b.dataset.pre]));applyTheme();save();designSheet()});
- $('rst').onclick=()=>{D.theme={};D.areas.forEach(a=>{if(ACOL[a.id])a.c=ACOL[a.id]});applyTheme();save();designSheet()};
+ $('rst').onclick=()=>{D.theme=JSON.parse(JSON.stringify(PRESETS.RONE));D.areas.forEach(a=>{if(ACOL[a.id])a.c=ACOL[a.id]});applyTheme();save();designSheet()};
  $('cl').onclick=()=>{close();render()};
 }
 
@@ -223,13 +251,13 @@ const PLAN={früh:[['Labor','6:00–14:30'],['Runterkommen','15–16 Uhr'],['Stu
 const since=d=>d?days(d)*-1:null;
 function heutePanel(){const st=shift(T0),S=SH[st]||SH.frei,P=PLAN[st]||PLAN.frei,f=focusList().slice(0,3),tm=new Date(TODAY);tm.setDate(tm.getDate()+1);const ST=SH[shift(iso(tm))]||SH.frei,
  evs=D.events.filter(e=>days(e.d)==0||(e.e&&days(e.d)<0&&days(e.e)>=0)&&!/urlaub/i.test(e.t)).filter(e=>!/urlaub/i.test(e.t));
- return `<div class="card mt"><h2><span><i class="ico">☀</i>// Heute · ${S[0]}</span><span class="r">Morgen: ${ST[0]}</span></h2>
+ return `<div class="card mt"><h2><span><i class="ico" style="--c:var(--h-leben)">☀</i>Heute · ${S[0]}</span><span class="r">Morgen: ${ST[0]}</span></h2>
  <div class="hgrid"><div><div class="sec" style="margin-top:0">Top 3 für heute</div>${f.map((t,i)=>`<div class="top3"><b>${i+1}</b><span>${esc(t.t)}</span><button class="ck" data-done="${t.id}"></button></div>`).join('')||'<div class="empty">Nichts Dringendes – Zeit fürs Studio 🎛</div>'}
  ${evs.length?`<div class="sec">Termine heute</div>${evs.map(e=>`<div class="top3"><b>●</b><span>${esc(e.t)}</span></div>`).join('')}`:''}</div>
  <div><div class="sec" style="margin-top:0">Dein Tag</div>${P.map(([a,b])=>`<div class="slot"><span>${a}</span><code>${b}</code></div>`).join('')}</div></div></div>`}
-function tracksPanel(){const L=[...(D.tracks||[])].sort((a,b)=>(a.prio||9)-(b.prio||9));return `<div class="card"><h2><span><i class="ico">♫</i>// Tracks in Arbeit</span><button data-trk="0">+ Track</button></h2>${L.map(t=>{const dd=t.dl?days(t.dl):null;return `<div class="trk" data-trk="${t.id}"><div class="t"><b>${esc(t.t)}</b><small>${esc(t.with||'')}${t.stage?' · '+esc(t.stage):''}</small><small class="nx">→ ${esc(t.next||'')}</small></div>${t.dl?`<span class="chip" style="${dd<=7?'color:var(--p1);border-color:var(--p1)':''}">${dd<0?'überfällig':dd==0?'heute':dd+' T.'}</span>`:''}</div>`}).join('')||'<div class="empty">Keine Tracks eingetragen.</div>'}</div>`}
-function waitPanel(){const L=[...(D.waits||[])].sort((a,b)=>(a.since||'9').localeCompare(b.since||'9'));return `<div class="card"><h2><span><i class="ico">⏳</i>// Warte auf …</span><button data-wt="0">+ Neu</button></h2>${L.map(w=>{const s=since(w.since);return `<div class="trk" data-wt="${w.id}"><div class="t"><b>${esc(w.who)}</b><small>${esc(w.what)}</small>${w.next?`<small class="nx">→ ${esc(w.next)}</small>`:''}</div><span class="chip" style="${s>=10?'color:var(--p1);border-color:var(--p1)':''}">${s==null?'seit ?':s==0?'seit heute':'seit '+s+' T.'}</span></div>`}).join('')||'<div class="empty">Du wartest gerade auf niemanden.</div>'}</div>`}
-function logPanel(){const L=D.log||[];return `<div class="card mt"><h2><span><i class="ico">⌁</i>// Check-in mit Claude</span><span class="r">${L[0]?'Zuletzt '+fdt(L[0].at):'noch keiner'}</span></h2>
+function tracksPanel(){const L=[...(D.tracks||[])].sort((a,b)=>(a.prio||9)-(b.prio||9));return `<div class="card"><h2><span><i class="ico" style="--c:var(--h-musik)">♫</i>Tracks in Arbeit</span><button data-trk="0">+ Track</button></h2>${L.map(t=>{const dd=t.dl?days(t.dl):null;return `<div class="trk" data-trk="${t.id}"><div class="t"><b>${esc(t.t)}</b><small>${esc(t.with||'')}${t.stage?' · '+esc(t.stage):''}</small><small class="nx">→ ${esc(t.next||'')}</small></div>${t.dl?`<span class="chip" style="${dd<=7?'color:var(--p1);border-color:var(--p1)':''}">${dd<0?'überfällig':dd==0?'heute':dd+' T.'}</span>`:''}</div>`}).join('')||'<div class="empty">Keine Tracks eingetragen.</div>'}</div>`}
+function waitPanel(){const L=[...(D.waits||[])].sort((a,b)=>(a.since||'9').localeCompare(b.since||'9'));return `<div class="card"><h2><span><i class="ico" style="--c:var(--h-warten)">⏳</i>Warte auf …</span><button data-wt="0">+ Neu</button></h2>${L.map(w=>{const s=since(w.since);return `<div class="trk" data-wt="${w.id}"><div class="t"><b>${esc(w.who)}</b><small>${esc(w.what)}</small>${w.next?`<small class="nx">→ ${esc(w.next)}</small>`:''}</div><span class="chip" style="${s>=10?'color:var(--p1);border-color:var(--p1)':''}">${s==null?'seit ?':s==0?'seit heute':'seit '+s+' T.'}</span></div>`}).join('')||'<div class="empty">Du wartest gerade auf niemanden.</div>'}</div>`}
+function logPanel(){const L=D.log||[];return `<div class="card mt"><h2><span><i class="ico" style="--c:var(--h-leben)">⌁</i>Check-in mit Claude</span><span class="r">${L[0]?'Zuletzt '+fdt(L[0].at):'noch keiner'}</span></h2>
  <div class="hgrid"><div><div class="sec" style="margin-top:0">Was sich geändert hat</div>${L.slice(0,3).map(c=>`<div class="logc"><code>${fdt(c.at)}</code>${c.items.map(i=>`<div class="li">${esc(i)}</div>`).join('')}</div>`).join('')||'<div class="empty">Schreib Claude kurz, was offen ist – das Update erscheint hier.</div>'}</div>
  <div id="mailbox">${mailList()}</div></div></div>`}
 function mailList(){const M=D.mails||[],O=M.filter(m=>!m.done),dn=M.length-O.length;
@@ -284,12 +312,12 @@ function projSug(){const P=D.projects||[],q=pq.trim().toLowerCase(),bx=$('psug')
 function vProj(){const P=D.projects||[],cnt=k=>P.filter(p=>p.st==k).length;
  const F=[['aktiv','Läuft & Als Nächstes'],['idee','Ideen'],['fertig','Fertig'],['alle','Alle']];
  const L=P.filter(p=>pdev=='alle'||(p.dev||[]).includes(pdev)||(p.dev||[]).includes('ueberall')).filter(p=>pflt=='alle'||(pflt=='aktiv'?(p.st=='läuft'||p.st=='bald'):pflt=='idee'?(p.st=='idee'||p.st=='pause'):p.st==pflt)).sort((a,b)=>['läuft','bald','idee','pause','fertig'].indexOf(a.st)-['läuft','bald','idee','pause','fertig'].indexOf(b.st));
- $('v').innerHTML=`<div class="card"><h2><span><i class="ico">✦</i>// Projekte & Ideen</span><button id="padd">+ Projekt</button></h2>
- <p class="sub" style="margin:-4px 0 12px">Alles, was wir bauen wollen oder schon bauen. <b style="color:var(--tx)">▶ Starten</b> kopiert dir einen Satz – in einen neuen Chat mit Claude einfügen, und es geht los.</p>
+ $('v').innerHTML=`<div class="card"><h2><span><i class="ico" style="--c:var(--h-projekte)">✦</i>Deine Projekte</span><button id="padd">+ Projekt</button></h2>
+ <p class="sub" style="margin:-4px 0 12px"><b style="color:var(--tx)">▶ Starten</b> kopiert dir einen Satz – in einen neuen Chat mit Claude einfügen, und es geht los.</p>
  <div class="devf"><span>Wo bin ich gerade?</span>${[['alle','Alle'],...Object.entries(DEV).map(([k,v])=>[k,v[0]+' '+v[1]])].map(([k,l])=>`<button data-dv="${k}" class="${pdev==k?'on':''}" style="${k!='alle'?'--c:'+DEV[k][2]:''}">${l}</button>`).join('')}</div>
  <div class="ftabs">${F.map(([k,l])=>`<button data-pf="${k}" class="${pflt==k?'on':''}">${l} <span style="opacity:.6">${k=='aktiv'?cnt('läuft')+cnt('bald'):k=='idee'?cnt('idee')+cnt('pause'):k=='alle'?P.length:cnt(k)}</span></button>`).join('')}</div>
  ${PSEC.map(sc=>{const G=L.filter(p=>(p.sec||'ki')==sc[0]);return G.length?`<div class="psec ${popen.has(sc[0])?'open':''}"><div class="psh" data-sx="${sc[0]}"><span class="pi">${sc[1]}</span><div><b>${sc[2]}</b><small>${sc[3]}</small></div><span class="chip">${G.length}</span><span class="chev">▸</span></div><div class="pgrid">${G.map(pCard).join('')}</div></div>`:''}).join('')||'<div class="empty">Hier ist noch nichts.</div>'}</div></div>
- <div class="card mt"><h2><span><i class="ico">💡</i>// Schnelle Ideen</span><span class="r">aus dem Capture-Feld</span></h2>${D.ideas.map((x,i)=>`<div class="idea"><span>${AR(x.a).i}</span><div class="t">${esc(x.t)}<br><small class="sub">${fd(x.d)}</small></div><button class="btn g s" data-ip="${i}">→ Projekt</button><button class="btn g s" data-it="${i}">→ To-do</button><button class="x" data-id="${i}">✕</button></div>`).join('')||'<div class="empty">Schreib oben z. B. „Idee: Presetpack aus dem Alien Sound Lab verkaufen“ – landet hier.</div>'}</div>`;
+ <div class="card mt"><h2><span><i class="ico" style="--c:var(--h-todos)">💡</i>Schnelle Ideen</span><span class="r">aus dem Capture-Feld</span></h2>${D.ideas.map((x,i)=>`<div class="idea"><span>${AR(x.a).i}</span><div class="t">${esc(x.t)}<br><small class="sub">${fd(x.d)}</small></div><button class="btn g s" data-ip="${i}">→ Projekt</button><button class="btn g s" data-it="${i}">→ To-do</button><button class="x" data-id="${i}">✕</button></div>`).join('')||'<div class="empty">Schreib oben z. B. „Idee: Presetpack aus dem Alien Sound Lab verkaufen“ – landet hier.</div>'}</div>`;
  document.querySelectorAll('[data-pf]').forEach(b=>b.onclick=()=>{pflt=b.dataset.pf;uiSave();render()});document.querySelectorAll('[data-dv]').forEach(b=>b.onclick=()=>{pdev=b.dataset.dv;uiSave();render()});
  document.querySelectorAll('[data-sx]').forEach(h=>h.onclick=()=>{const k=h.dataset.sx;popen.has(k)?popen.delete(k):popen.add(k);h.parentNode.classList.toggle('open',popen.has(k))});
  document.querySelectorAll('[data-pe]').forEach(b=>b.onclick=()=>projSheet(+b.dataset.pe));document.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>finishSheet(+b.dataset.pd));$('padd').onclick=()=>projSheet(0);
@@ -336,11 +364,11 @@ function habToday(){return D.habits.map(h=>{const d=habDone(h),ic=(h.t.match(/^\
 function bindStart(){bindTodos();document.querySelectorAll('[data-ht]').forEach(b=>b.onclick=()=>{const L=D.hlog[WK]=D.hlog[WK]||{};const r=L[b.dataset.ht]=L[b.dataset.ht]||[0,0,0,0,0,0,0];r[todayIdx]=r[todayIdx]?0:1;save();refreshSide()})}
 function vStart(){
  const t=ftot(),o=open();
- $('v').innerHTML=`${heutePanel()}<div class="card nx mt"><h2 style="padding:2px 4px 0"><span><i class="ico">◈</i>// Neural Nexus</span><button id="rev">Wochen-Check-in ↻</button></h2><canvas id="nexus"></canvas></div>
- <div class="card mt"><h2><span><i class="ico">✓</i>// To-dos</span><span class="r">${o.length} offen · <span style="color:var(--p1)">${o.filter(x=>x.p==1).length} mit hoher Priorität</span></span></h2><div id="tdbox">${todoPanel()}</div></div>
+ $('v').innerHTML=`${heutePanel()}<div class="card nx mt"><h2 style="padding:2px 4px 0"><span><i class="ico" style="--c:var(--h-leben)">◈</i>Neural Nexus</span><button id="rev">Wochen-Check-in ↻</button></h2><canvas id="nexus"></canvas></div>
+ <div class="card mt"><h2><span><i class="ico" style="--c:var(--h-todos)">✓</i>To-dos</span><span class="r">${o.length} offen · <span style="color:var(--p1)">${o.filter(x=>x.p==1).length} mit hoher Priorität</span></span></h2><div id="tdbox">${todoPanel()}</div></div>
  <div class="grid mt">${tracksPanel()}${waitPanel()}</div>
- <div class="grid mt"><div class="card"><h2><span><i class="ico">▦</i>// Als Nächstes</span><a href="#kalender">Kalender →</a></h2>${upcoming(5).map(evRow).join('')}</div>
- <div class="card"><h2><span><i class="ico">◆</i>// Cockpit</span><a href="#musik">Musik →</a></h2><div class="kpis k2">${D.kpis.slice(0,3).map(k=>`<div class="kpi ed" data-k="${k.id}"><small>${esc(k.l)}</small><b>${esc(k.v)}</b><i>${esc(k.s)}</i></div>`).join('')}<a class="kpi" href="#finanzen"><small>Bleibt im Monat</small><b style="${t.r<0?'color:var(--p1)':''}">${eur(t.r).replace(',00','')}</b><i>nach Fixkosten & Abos</i></a></div></div></div>
+ <div class="grid mt"><div class="card"><h2><span><i class="ico" style="--c:var(--h-kalender)">▦</i>Als Nächstes</span><a href="#kalender">Kalender →</a></h2>${upcoming(5).map(evRow).join('')}</div>
+ <div class="card"><h2><span><i class="ico" style="--c:var(--h-finanzen)">◆</i>Cockpit</span><a href="#musik">Musik →</a></h2><div class="kpis k2">${D.kpis.slice(0,3).map(k=>`<div class="kpi ed" data-k="${k.id}"><small>${esc(k.l)}</small><b>${esc(k.v)}</b><i>${esc(k.s)}</i></div>`).join('')}<a class="kpi" href="#finanzen"><small>Bleibt im Monat</small><b style="${t.r<0?'color:var(--p1)':''}">${eur(t.r).replace(',00','')}</b><i>nach Fixkosten & Abos</i></a></div></div></div>
  ${logPanel()}`;
  bindNexus();bindStart();bindEv($('v'));bindKpi();bindExt();$('rev').onclick=reviewSheet;
 }
@@ -348,19 +376,19 @@ function vTodos(){
  const o=D.todos,pr=[[1,'Hohe Priorität',PC(1)],[2,'Mittel',PC(2)],[3,'Niedrig',PC(3)]];
  const done=o.filter(t=>t.done).sort((a,b)=>(b.at||'').localeCompare(a.at||''));
  $('v').innerHTML=`<div class="cols">${pr.map(([p,l,c])=>{const L=o.filter(t=>!t.done&&!sleeping(t)&&t.p==p).sort((a,b)=>(a.d||'9').localeCompare(b.d||'9'));return `<div class="card col t3"><h3><span class="dot" style="background:${c};color:${c}"></span>${l} <span class="chip">${L.length}</span></h3>${L.map(t=>todoRow(t).replace('class="item','class="tc item')).join('')||'<div class="empty">Leer 🎉</div>'}</div>`}).join('')}</div>
- ${(()=>{const W=o.filter(t=>sleeping(t)&&!t.done).sort((a,b)=>a.d.localeCompare(b.d));return W.length?`<div class="card" style="margin-top:12px"><h2><span><i class="ico">↻</i>// Kommt wieder (${W.length})</span></h2>${W.map(t=>todoRow(t)).join('')}</div>`:''})()}
- <div class="card" style="margin-top:12px"><h2><span><i class="ico">◈</i>// Erledigt (${done.length})</span> <button id="clr">Erledigte löschen</button></h2>${done.slice(0,15).map(t=>todoRow(t)).join('')||'<div class="empty">Noch nichts abgehakt.</div>'}</div>`;
+ ${(()=>{const W=o.filter(t=>sleeping(t)&&!t.done).sort((a,b)=>a.d.localeCompare(b.d));return W.length?`<div class="card" style="margin-top:12px"><h2><span><i class="ico" style="--c:var(--h-todos)">↻</i>Kommt wieder (${W.length})</span></h2>${W.map(t=>todoRow(t)).join('')}</div>`:''})()}
+ <div class="card" style="margin-top:12px"><h2><span><i class="ico" style="--c:var(--h-finanzen)">✓</i>Erledigt (${done.length})</span> <button id="clr">Erledigte löschen</button></h2>${done.slice(0,15).map(t=>todoRow(t)).join('')||'<div class="empty">Noch nichts abgehakt.</div>'}</div>`;
  bindTodos();$('clr').onclick=()=>{D.todos=D.todos.filter(t=>!t.done);render();save()};
 }
 function vCal(){
  const m0=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);let h='';
  for(let k=0;k<2;k++){const m=new Date(m0.getFullYear(),m0.getMonth()+k,1),first=(m.getDay()+6)%7,n=new Date(m.getFullYear(),m.getMonth()+1,0).getDate();
-  h+=`<div class="card"><h2><span><i class="ico">◈</i>// ${MOL[m.getMonth()]} ${m.getFullYear()}</span></h2><div class="mini">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(x=>`<div class="h">${x}</div>`).join('')}${'<div></div>'.repeat(first)}`;
+  h+=`<div class="card"><h2><span><i class="ico" style="--c:var(--h-kalender)">▦</i>${MOL[m.getMonth()]} ${m.getFullYear()}</span></h2><div class="mini">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(x=>`<div class="h">${x}</div>`).join('')}${'<div></div>'.repeat(first)}`;
   for(let d=1;d<=n;d++){const s=iso(new Date(m.getFullYear(),m.getMonth(),d)),ev=D.events.find(e=>e.d==s||(e.e&&s>e.d&&s<=e.e)),sh=SH[shift(s)];
    h+=`<div class="d ${s==T0?'today':''} ${sh[1]}" title="${sh[0]}${ev?' · '+esc(ev.t):''}">${d}${ev?`<i style="background:${ev.gig?TH().hub.musik:ev.dl?TH().p1:TH().cy}"></i>`:''}</div>`}
   h+=`</div><div class="row" style="font-size:11px;color:var(--mu);justify-content:flex-start;gap:12px;flex-wrap:wrap"><span><span class="dot" style="background:#ffd36b55"></span> Früh</span><span><span class="dot" style="background:#3ee8ff55"></span> Spät</span><span><span class="dot" style="background:#5ef2c955"></span> frei/Urlaub</span><span><span class="dot" style="background:#ff7aa8"></span> Gig</span><span><span class="dot" style="background:#ff6b8a"></span> Deadline</span></div></div>`}
- $('v').innerHTML=`<div class="grid"><div class="stack">${h}<div class="card"><h2><span><i class="ico">◈</i>// Schicht-Rhythmus</span></h2><p class="sub" style="margin:0 0 10px">Ab ${fd(D.shifts.base)} beginnt eine <b>${D.shifts.baseType}</b>-Woche, danach im Wechsel. Urlaub oder Tagschicht trägst du als Ausnahme ein.</p><button class="btn g s" id="exc">+ Ausnahme / Urlaub</button></div></div>
- <div class="card"><h2><span><i class="ico">◈</i>// Termine & Deadlines</span> <button id="ne">+ Termin</button></h2>${upcoming(30).map(evRow).join('')||'<div class="empty">Keine Termine.</div>'}</div></div>`;
+ $('v').innerHTML=`<div class="grid"><div class="stack">${h}<div class="card"><h2><span><i class="ico" style="--c:var(--h-kalender)">◑</i>Schicht-Rhythmus</span></h2><p class="sub" style="margin:0 0 10px">Ab ${fd(D.shifts.base)} beginnt eine <b>${D.shifts.baseType}</b>-Woche, danach im Wechsel. Urlaub oder Tagschicht trägst du als Ausnahme ein.</p><button class="btn g s" id="exc">+ Ausnahme / Urlaub</button></div></div>
+ <div class="card"><h2><span><i class="ico" style="--c:var(--h-kalender)">⏰</i>Termine & Deadlines</span> <button id="ne">+ Termin</button></h2>${upcoming(30).map(evRow).join('')||'<div class="empty">Keine Termine.</div>'}</div></div>`;
  bindEv($('v'));$('ne').onclick=()=>evSheet(0);$('exc').onclick=excSheet;
 }
 function habitWeek(){
@@ -371,8 +399,8 @@ function habitWeek(){
 function bindHab(){document.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{const L=D.hlog[WK]=D.hlog[WK]||{};const r=L[b.dataset.h]=L[b.dataset.h]||[0,0,0,0,0,0,0];r[+b.dataset.i]=r[+b.dataset.i]?0:1;render();save()})}
 function vHabits(){
  const weeks=Object.keys(D.hlog).sort().slice(-8);
- $('v').innerHTML=`<div class="card"><h2><span><i class="ico">◈</i>// Diese Woche</span> <button id="hed">Routinen bearbeiten</button></h2>${habitWeek()}</div>
- <div class="card" style="margin-top:12px"><h2><span><i class="ico">◈</i>// Verlauf (Wochenziel erreicht)</span></h2>${weeks.length?D.habits.map(x=>`<div class="goal"><div class="row"><span style="font-size:14px">${esc(x.t)}</span><span class="sub" style="margin:0">${weeks.map(w=>{const c=((D.hlog[w]||{})[x.id]||[]).filter(Boolean).length;return c>=x.goal?'🟣':c?'⚪':'·'}).join(' ')}</span></div></div>`).join(''):'<div class="empty">Ab nächster Woche siehst du hier deinen Verlauf.</div>'}</div>`;
+ $('v').innerHTML=`<div class="card"><h2><span><i class="ico" style="--c:var(--h-todos)">▤</i>Diese Woche</span> <button id="hed">Routinen bearbeiten</button></h2>${habitWeek()}</div>
+ <div class="card" style="margin-top:12px"><h2><span><i class="ico" style="--c:var(--h-finanzen)">↗</i>Verlauf (Wochenziel erreicht)</span></h2>${weeks.length?D.habits.map(x=>`<div class="goal"><div class="row"><span style="font-size:14px">${esc(x.t)}</span><span class="sub" style="margin:0">${weeks.map(w=>{const c=((D.hlog[w]||{})[x.id]||[]).filter(Boolean).length;return c>=x.goal?'🟣':c?'⚪':'·'}).join(' ')}</span></div></div>`).join(''):'<div class="empty">Ab nächster Woche siehst du hier deinen Verlauf.</div>'}</div>`;
  bindHab();$('hed').onclick=habitSheet;
 }
 function bindKpi(){document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>kpiSheet(b.dataset.k))}
@@ -388,9 +416,9 @@ function vFin(){
  $('v').innerHTML=`<div class="grid"><div class="stack"><div class="fhero t3"><div class="l">Bleibt dir im Monat</div><div class="big" style="${t.r<0?'color:var(--red)':''}">${eur(t.r)}</div>
  <div class="bar" style="height:10px">${Object.entries(bycat).map(([c,v])=>`<span style="width:${v/base*100}%;background:${CATS[c]||'#888'}"></span>`).join('')}<span style="width:${t.j/base*100}%;background:#fff8"></span></div>
  <div class="row3"><div>Einnahmen<b>${eur(t.e)}</b></div><div>Fixkosten<b>${eur(t.a)}</b></div><div>Jahres-Abos/Mon.<b>${eur(t.j)}</b></div></div></div>
- <div class="card"><h2><span><i class="ico">◈</i>// Nach Kategorie</span></h2>${Object.entries(bycat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="cat"><span class="t"><span class="dot" style="background:${CATS[c]||'#888'};color:${CATS[c]||'#888'}"></span>${esc(c)}</span><b>${eur(v)}</b></div>`).join('')}</div>
- ${raten.length?`<div class="card"><h2><span><i class="ico">◈</i>// Laufende Raten</span></h2>${raten.map(x=>`<div class="goal"><div class="row"><span style="font-size:14px">${esc(x.name)}</span><span class="sub" style="margin:0">noch ${left(x)} Mon. · ${eur(left(x)*x.b)}</span></div></div>`).join('')}</div>`:''}</div>
- <div class="card"><h2><span><i class="ico">◈</i>// Einträge</span> <button id="fadd">+ Neu</button></h2><div class="ftabs" style="margin-top:0">${[['monat','Monatlich'],['einnahmen','Einnahmen'],['jaehrlich','Jährlich']].map(([k,l])=>`<button data-ft="${k}" class="${ftab==k?'on':''}">${l}</button>`).join('')}</div>${body}
+ <div class="card"><h2><span><i class="ico" style="--c:var(--h-finanzen)">◔</i>Nach Kategorie</span></h2>${Object.entries(bycat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="cat"><span class="t"><span class="dot" style="background:${CATS[c]||'#888'};color:${CATS[c]||'#888'}"></span>${esc(c)}</span><b>${eur(v)}</b></div>`).join('')}</div>
+ ${raten.length?`<div class="card"><h2><span><i class="ico" style="--c:var(--h-finanzen)">⇄</i>Laufende Raten</span></h2>${raten.map(x=>`<div class="goal"><div class="row"><span style="font-size:14px">${esc(x.name)}</span><span class="sub" style="margin:0">noch ${left(x)} Mon. · ${eur(left(x)*x.b)}</span></div></div>`).join('')}</div>`:''}</div>
+ <div class="card"><h2><span><i class="ico" style="--c:var(--h-finanzen)">≡</i>Einträge</span> <button id="fadd">+ Neu</button></h2><div class="ftabs" style="margin-top:0">${[['monat','Monatlich'],['einnahmen','Einnahmen'],['jaehrlich','Jährlich']].map(([k,l])=>`<button data-ft="${k}" class="${ftab==k?'on':''}">${l}</button>`).join('')}</div>${body}
  <p class="sub" style="margin-top:10px">Tippe auf einen Eintrag zum Bearbeiten · Schalter = zählt mit / pausiert</p></div></div>`;
  document.querySelectorAll('[data-ft]').forEach(b=>b.onclick=()=>{ftab=b.dataset.ft;render()});
  document.querySelectorAll('[data-tg]').forEach(b=>b.onclick=e=>{e.stopPropagation();const x=D.fin[ftab].find(i=>i.id==b.dataset.tg);x.on=!x.on;render();save()});
@@ -414,23 +442,23 @@ function finSheet(id){const x=id?D.fin[ftab].find(i=>i.id==id):null;
 function vMusik(){
  const gigs=D.events.filter(e=>e.gig).sort((a,b)=>a.d.localeCompare(b.d)),dl=D.events.filter(e=>e.dl&&days(e.d)>=0);
  const cols=[['sp','Spotify'],['bp','Beatport'],['sc','SoundCloud'],['yt','YouTube'],['am','Apple']];
- $('v').innerHTML=`<div class="grid" style="margin-bottom:12px">${tracksPanel()}${waitPanel()}</div><div class="card"><h2><span><i class="ico">◈</i>// Zahlen</span> <span class="sub" style="margin:0;text-transform:none;letter-spacing:0">Tippen zum Ändern</span></h2><div class="kpis">${D.kpis.map(k=>`<div class="kpi ed" data-k="${k.id}"><small>${esc(k.l)}</small><b>${esc(k.v)}</b><i>${esc(k.s)}</i></div>`).join('')}</div></div>
- <div class="grid" style="margin-top:12px"><div class="card"><h2><span><i class="ico">◈</i>// Gigs</span></h2>${gigs.map(evRow).join('')}</div><div class="card"><h2><span><i class="ico">◈</i>// Deadlines</span></h2>${dl.map(evRow).join('')||'<div class="empty">Keine Deadlines.</div>'}</div></div>
- <div class="card" style="margin-top:16px;overflow-x:auto"><h2><span><i class="ico">◈</i>// Song-Tracker (releaste Songs)</span> <button id="addrel">+ Song</button></h2>
+ $('v').innerHTML=`<div class="grid" style="margin-bottom:12px">${tracksPanel()}${waitPanel()}</div><div class="card"><h2><span><i class="ico" style="--c:var(--h-musik)">#</i>Zahlen</span> <span class="sub" style="margin:0;text-transform:none;letter-spacing:0">Tippen zum Ändern</span></h2><div class="kpis">${D.kpis.map(k=>`<div class="kpi ed" data-k="${k.id}"><small>${esc(k.l)}</small><b>${esc(k.v)}</b><i>${esc(k.s)}</i></div>`).join('')}</div></div>
+ <div class="grid" style="margin-top:12px"><div class="card"><h2><span><i class="ico" style="--c:var(--h-musik)">🎤</i>Gigs</span></h2>${gigs.map(evRow).join('')}</div><div class="card"><h2><span><i class="ico" style="--c:var(--h-musik)">⏰</i>Deadlines</span></h2>${dl.map(evRow).join('')||'<div class="empty">Keine Deadlines.</div>'}</div></div>
+ <div class="card" style="margin-top:16px;overflow-x:auto"><h2><span><i class="ico" style="--c:var(--h-musik)">♫</i>Song-Tracker (releaste Songs)</span> <button id="addrel">+ Song</button></h2>
  <p class="sub" style="margin:0 0 8px">Streams/Plays pro Plattform – erstmal von Hand oder von Claude im Morgen-Briefing, später automatisch.</p>
  <table class="rel"><tr><th>Song</th>${cols.map(c=>`<th>${c[1]}</th>`).join('')}<th>Σ</th></tr>${D.releases.map((r,i)=>{const sum=cols.reduce((s,c)=>s+(+String(r[c[0]]).replace(/\D/g,'')||0),0);return `<tr><td style="min-width:170px"><b style="font-weight:500">${esc(r.t)}</b><br><small class="sub">${esc(r.lab)} · ${fd(r.d)}</small></td>${cols.map(c=>`<td><input inputmode="numeric" data-r="${i}" data-c="${c[0]}" value="${esc(r[c[0]])}" placeholder="–"></td>`).join('')}<td><b>${sum?sum.toLocaleString('de-DE'):'–'}</b></td></tr>`}).join('')}</table></div>
- <div class="card" style="margin-top:12px"><h2><span><i class="ico">◈</i>// Tingeltangel</span></h2><div class="links">${[['https://open.spotify.com/intl-de/artist/2YXrzWLczeCOkk1CsUQzEx','🟢','Spotify'],['https://www.beatport.com/artist/tingeltangel/2499191','🎚','Beatport'],['https://soundcloud.com/tingeltangel_music','☁️','SoundCloud'],['https://www.instagram.com/tingeltangel_music/','📸','Instagram'],['https://www.youtube.com/@tingeltangel_music','▶️','YouTube'],['https://linktr.ee/tingeltangel_music','🌳','Linktree']].map(a=>`<a class="lk" href="${a[0]}" target="_blank"><span>${a[1]}</span>${a[2]}</a>`).join('')}</div></div>`;
+ <div class="card" style="margin-top:12px"><h2><span><i class="ico" style="--c:var(--h-musik)">✺</i>Tingeltangel</span></h2><div class="links">${[['https://open.spotify.com/intl-de/artist/2YXrzWLczeCOkk1CsUQzEx','🟢','Spotify'],['https://www.beatport.com/artist/tingeltangel/2499191','🎚','Beatport'],['https://soundcloud.com/tingeltangel_music','☁️','SoundCloud'],['https://www.instagram.com/tingeltangel_music/','📸','Instagram'],['https://www.youtube.com/@tingeltangel_music','▶️','YouTube'],['https://linktr.ee/tingeltangel_music','🌳','Linktree']].map(a=>`<a class="lk" href="${a[0]}" target="_blank"><span>${a[1]}</span>${a[2]}</a>`).join('')}</div></div>`;
  bindEv($('v'));bindKpi();bindExt();
  document.querySelectorAll('[data-r]').forEach(e=>e.onchange=()=>{D.releases[+e.dataset.r][e.dataset.c]=e.value.trim();render();save()});
  $('addrel').onclick=()=>{D.releases.unshift({t:'Neuer Song',lab:'',d:T0,sp:'',bp:'',sc:'',yt:'',am:''});render();save()};
 }
 function vZiele(){
- $('v').innerHTML=`<div class="card"><h2><span><i class="ico">◈</i>// 5-Jahres-Ziel (≈ 2031)</span></h2>${D.goals.map((g,i)=>`<div class="goal"><div class="row"><span style="font-size:14px">${esc(g.t)}</span><b style="color:var(--cy)">${g.p}%</b></div><input type="range" min="0" max="100" step="5" value="${g.p}" data-g="${i}"></div>`).join('')}</div>
- <div class="card" style="margin-top:12px"><h2><span><i class="ico">◈</i>// Lebensbereiche – Verlauf</span> <button id="rev2">Wochen-Check-in</button></h2>${D.reviews.length?`<p class="sub" style="margin:0 0 8px">Life Score pro Woche</p><div style="display:flex;align-items:flex-end;gap:6px;height:110px">${D.reviews.slice(-12).map(r=>`<div style="flex:1;text-align:center"><div style="height:${r.sc}px;background:linear-gradient(0deg,rgba(77,183,223,.2),var(--cy));border-radius:2px;box-shadow:0 0 12px rgba(77,183,223,.4)"></div><small class="sub" style="font-size:10px">${r.d.slice(8,10)}.${r.d.slice(5,7)}.</small></div>`).join('')}</div>`:'<div class="empty">Mach sonntags den Wochen-Check-in: jeden Bereich 1–10 bewerten, dann siehst du hier, wie sich dein Leben entwickelt.</div>'}</div>`;
+ $('v').innerHTML=`<div class="card"><h2><span><i class="ico" style="--c:var(--h-projekte)">★</i>5-Jahres-Ziel (≈ 2031)</span></h2>${D.goals.map((g,i)=>`<div class="goal"><div class="row"><span style="font-size:14px">${esc(g.t)}</span><b style="color:var(--cy)">${g.p}%</b></div><input type="range" min="0" max="100" step="5" value="${g.p}" data-g="${i}"></div>`).join('')}</div>
+ <div class="card" style="margin-top:12px"><h2><span><i class="ico" style="--c:var(--h-leben)">↗</i>Lebensbereiche – Verlauf</span> <button id="rev2">Wochen-Check-in</button></h2>${D.reviews.length?`<p class="sub" style="margin:0 0 8px">Life Score pro Woche</p><div style="display:flex;align-items:flex-end;gap:6px;height:110px">${D.reviews.slice(-12).map(r=>`<div style="flex:1;text-align:center"><div style="height:${r.sc}px;background:linear-gradient(0deg,rgba(77,183,223,.2),var(--cy));border-radius:2px;box-shadow:0 0 12px rgba(77,183,223,.4)"></div><small class="sub" style="font-size:10px">${r.d.slice(8,10)}.${r.d.slice(5,7)}.</small></div>`).join('')}</div>`:'<div class="empty">Mach sonntags den Wochen-Check-in: jeden Bereich 1–10 bewerten, dann siehst du hier, wie sich dein Leben entwickelt.</div>'}</div>`;
  document.querySelectorAll('[data-g]').forEach(r=>r.onchange=()=>{D.goals[+r.dataset.g].p=+r.value;render();save()});$('rev2').onclick=reviewSheet;
 }
 function vIdeen(){
- $('v').innerHTML=`<div class="card"><h2><span><i class="ico">◈</i>// Ideen-Parkplatz</span></h2><p class="sub" style="margin:0 0 10px">Alles, was im Eingabefeld als Idee erkannt wird, landet hier. Nichts geht verloren, nichts drängelt.</p>${D.ideas.map((x,i)=>`<div class="idea"><span>${AR(x.a).i}</span><div class="t">${esc(x.t)}<br><small class="sub">${fd(x.d)}</small></div><button class="btn g s" data-it="${i}">→ To-do</button><button class="x" data-id="${i}">✕</button></div>`).join('')||'<div class="empty">Noch keine Ideen. Schreib oben z. B. „Idee: Live-Stream aus dem Studio“.</div>'}</div>`;
+ $('v').innerHTML=`<div class="card"><h2><span><i class="ico" style="--c:var(--h-todos)">💡</i>Ideen-Parkplatz</span></h2><p class="sub" style="margin:0 0 10px">Alles, was im Eingabefeld als Idee erkannt wird, landet hier. Nichts geht verloren, nichts drängelt.</p>${D.ideas.map((x,i)=>`<div class="idea"><span>${AR(x.a).i}</span><div class="t">${esc(x.t)}<br><small class="sub">${fd(x.d)}</small></div><button class="btn g s" data-it="${i}">→ To-do</button><button class="x" data-id="${i}">✕</button></div>`).join('')||'<div class="empty">Noch keine Ideen. Schreib oben z. B. „Idee: Live-Stream aus dem Studio“.</div>'}</div>`;
  document.querySelectorAll('[data-it]').forEach(b=>b.onclick=()=>{const x=D.ideas.splice(+b.dataset.it,1)[0];D.todos.push({id:D.next++,t:x.t,a:x.a,p:3,d:'',done:false});render();save()});
  document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{D.ideas.splice(+b.dataset.id,1);render();save()});
 }
@@ -525,8 +553,10 @@ const BODY=`
 `;
 
 /* ---------- Sternenhimmel ---------- */
-(function(){const c=$('stars'),x=c.getContext('2d');let S=[];function rs(){c.width=innerWidth;c.height=innerHeight;S=Array.from({length:90},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.3+.2,p:Math.random()*6,v:Math.random()*.08+.02}))}rs();addEventListener('resize',rs);
+(function(){const c=$('stars');if(getComputedStyle(c).display=='none')return;const x=c.getContext('2d');let S=[];function rs(){c.width=innerWidth;c.height=innerHeight;S=Array.from({length:90},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.3+.2,p:Math.random()*6,v:Math.random()*.08+.02}))}rs();addEventListener('resize',rs);
  (function f(t){x.clearRect(0,0,c.width,c.height);S.forEach(s=>{s.y-=s.v;if(s.y<0)s.y=c.height;x.globalAlpha=.25+.4*Math.sin(t/1400+s.p);x.fillStyle='#a9c7cf';x.globalAlpha*=.6;x.beginPath();x.arc(s.x,s.y,s.r,0,7);x.fill()});requestAnimationFrame(f)})(0)})();
+/* Neuer Look (RONE-Stil) einmalig aktivieren – alte Vorlagen bleiben unter Design wählbar */
+window.migrateSkin=function(){if(D.skin==='rone')return;D.skin='rone';D.theme=JSON.parse(JSON.stringify(PRESETS.RONE));applyTheme();if(!$('ov').classList.contains('on'))render();save()};
 {const u=uiLoad();if(u){if(u.pflt)pflt=u.pflt;if(u.pdev)pdev=u.pdev;const fresh=Date.now()-u.t<120000;
  if(fresh){if(!location.hash&&u.view&&u.view!='start'){view=u.view;history.replaceState(null,'','#'+view)}if(u.nx&&u.nx[0]){NX.sel=u.nx[0];NX.sub=u.nx[1];NX.k=1}}
  applyTheme();render();if(fresh&&u.y)requestAnimationFrame(()=>scrollTo(0,u.y))}else{applyTheme();render()}}
@@ -585,4 +615,4 @@ function lifeMarkdown(){
  return {'Life OS – Übersicht.md':u,'To-dos.md':t,'Projekte.md':p,'Kalender.md':k,'Check-in-Protokoll.md':l};
 }
 /* ---------- Anbindung an Sync-Modul ---------- */
-LOS.hooks={render:()=>{render()},sheet,close,capture:(t)=>capture(t),busy:()=>$('ov').classList.contains('on'),markdown:()=>lifeMarkdown()};
+LOS.hooks={render:()=>{applyTheme();render()},sheet,close,capture:(t)=>capture(t),busy:()=>$('ov').classList.contains('on'),markdown:()=>lifeMarkdown()};
