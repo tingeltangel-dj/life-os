@@ -146,79 +146,141 @@ function hexNode(x,X,Y,r,c,al,t,seed,big){const pul=.85+.15*Math.sin(t/900+seed)
  const cg=x.createRadialGradient(X,Y,0,X,Y,r*.62);cg.addColorStop(0,`rgba(255,255,255,${.95*al})`);cg.addColorStop(.35,hexA(c,al));cg.addColorStop(1,hexA(c,0));x.fillStyle=cg;x.beginPath();x.arc(X,Y,r*.62,0,7);x.fill()}
 function curve(x0,y0,x1,y1,b){const mx=(x0+x1)/2,my=(y0+y1)/2,dx=x1-x0,dy=y1-y0;return[mx-dy*b,my+dx*b]}
 function qpt(x0,y0,cx,cy,x1,y1,f){const u=1-f;return[u*u*x0+2*u*f*cx+f*f*x1,u*u*y0+2*u*f*cy+f*f*y1]}
-function nxFrame(t){requestAnimationFrame(nxFrame);const cv=$('nexus');if(!cv)return;
- const W=cv.clientWidth;if(!W)return;const SM=W<560,H=Math.round(SM?W*1.4:Math.min(660,W*.7)),dpr=Math.min(devicePixelRatio||1,2);
+/* ---------- Neural Nexus als Graph (wie Obsidian): zoomen, Unterpunkte klappen beim Rauszoomen in den Oberpunkt ---------- */
+const sst=(a,b,v)=>{const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t)};
+const G={nodes:[],by:{},cam:{x:0,y:0,k:.6},tgt:null,fitK:.6,alpha:1,W:0,H:0,hover:null,drag:null,ptr:new Map(),pinch:null,moved:false,built:false};
+/* Baum aus den Daten bauen: Mitte → Bereiche → Gruppen → einzelne Punkte */
+function nxTree(){const t=TH(),H=t.hub,M=MODS(),o=open(),ev=D.events.filter(e=>days(e.e||e.d)>=0).sort((a,b)=>a.d.localeCompare(b.d)),L=[];
+ const add=(key,par,d,n,s,c,act,extra)=>{L.push(Object.assign({key,par,d,n,s:s||'',c,act},extra||{}))};
+ add('root',null,0,'LIFE SCORE',String(score()),t.amb,{fit:1});
+ M.forEach(m=>add(m.id,'root',1,m.n,m.sub,m.c,{zoom:1}));
+ /* Musik */
+ add('mu:tr','musik',2,'Tracks',(D.tracks||[]).length+' in Arbeit',H.musik,{zoom:1});
+ (D.tracks||[]).forEach(x=>add('tr:'+x.id,'mu:tr',3,x.t+(x.with?' · '+x.with:''),x.next||'',H.musik,{go:()=>trackSheet(x.id)}));
+ const gd=D.events.filter(e=>(e.gig||e.dl)&&days(e.d)>=0);add('mu:gig','musik',2,'Gigs & Deadlines',gd.length+' anstehend',t.p1,{zoom:1});
+ gd.forEach(e=>add('mg:'+e.id,'mu:gig',3,e.t,fd(e.d),e.gig?H.musik:t.p1,{go:()=>evSheet(e.id)}));
+ add('mu:kpi','musik',2,'Zahlen',D.kpis.length+' Werte',H.musik,{zoom:1});
+ D.kpis.forEach(k=>add('kp:'+k.id,'mu:kpi',3,k.l+': '+k.v,k.s,H.musik,{go:()=>kpiSheet(k.id)}));
+ /* Projekte */
+ Object.keys(PG).forEach(g=>{const P=PJ(g);add('pj:'+g,'projekte',2,PG[g][0].replace(/^\S+\s/,''),P.length+' Projekte',PGC(g,t),{zoom:1});
+  P.forEach(p=>add('p:'+p.id,'pj:'+g,3,p.t,p.next||PST[p.st][0],p.st=='läuft'?t.ok:p.st=='bald'?t.cy:p.st=='idee'?t.amb:t.mu,{go:()=>projSheet(p.id)}))});
+ /* Finanzen */
+ const F=D.fin,fa=F.monat.filter(active),f=ftot();
+ add('fi:fix','finanzen',2,'Fixkosten',Math.round(f.a)+' € / Monat',H.finanzen,{zoom:1});
+ fa.filter(x=>!x.bis).sort((a,b)=>b.b-a.b).forEach(x=>add('fm:'+x.id,'fi:fix',3,x.name,eur(x.b),H.finanzen,{go:()=>finSheet(x.id,'monat')}));
+ const ra=fa.filter(x=>x.bis);add('fi:rat','finanzen',2,'Raten',ra.length+' laufend',t.amb,{zoom:1});
+ ra.forEach(x=>add('fr:'+x.id,'fi:rat',3,x.name,eur(x.b)+' · bis '+fmtBis(x.bis),t.amb,{go:()=>finSheet(x.id,'monat')}));
+ add('fi:ein','finanzen',2,'Einnahmen',Math.round(f.e)+' €',t.ok,{zoom:1});
+ F.einnahmen.filter(active).forEach(x=>add('fe:'+x.id,'fi:ein',3,x.name,eur(x.b),t.ok,{go:()=>finSheet(x.id,'einnahmen')}));
+ /* To-dos */
+ [1,2,3].forEach(p=>{const T=o.filter(x=>x.p==p).sort((a,b)=>(a.d||'9').localeCompare(b.d||'9'));add('td:'+p,'todos',2,['','Hoch','Mittel','Niedrig'][p],T.length+' offen',PC(p),{zoom:1});
+  T.forEach(x=>add('t:'+x.id,'td:'+p,3,x.t,x.d?fd(x.d):'',PC(p),{go:()=>todoSheet(x.id)}))});
+ /* Kalender */
+ const wk=ev.filter(e=>days(e.d)<=7),lt=ev.filter(e=>days(e.d)>7).slice(0,12);
+ add('ka:w','kalender',2,'Nächste 7 Tage',wk.length+' Termine',H.kalender,{zoom:1});
+ wk.forEach(e=>add('e:'+e.id,'ka:w',3,e.t,fd(e.d),e.gig?H.musik:e.dl?t.p1:H.kalender,{go:()=>evSheet(e.id)}));
+ add('ka:l','kalender',2,'Später',ev.filter(e=>days(e.d)>7).length+' Termine',H.kalender,{zoom:1});
+ lt.forEach(e=>add('e:'+e.id,'ka:l',3,e.t,fd(e.d),e.gig?H.musik:e.dl?t.p1:H.kalender,{go:()=>evSheet(e.id)}));
+ /* Warte auf + Leben: Punkte direkt am Bereich */
+ (D.waits||[]).forEach(w=>add('w:'+w.id,'warten',3,w.who+': '+w.what,w.since?'seit '+since(w.since)+' T.':'',H.warten,{go:()=>waitSheet(w.id)}));
+ D.areas.forEach(a=>add('a:'+a.id,'leben',3,a.n,a.s+'/10',a.c,{go:()=>rateSheet(a.id)}));
+ return L}
+/* Graph mit den aktuellen Daten abgleichen – Positionen bleiben erhalten */
+function nxSync(){const L=nxTree(),old=G.by,by={},rnd=()=>Math.random()-.5;let fresh=0;
+ const MP={musik:[-.5,-.85],projekte:[.5,-.85],finanzen:[1,0],todos:[.55,.85],kalender:[-.55,.85],warten:[0,1.05],leben:[-1,0]};
+ L.forEach(n=>{const p=old[n.key];if(p){const mv=p.par!==n.par;Object.assign(p,n);by[n.key]=p;if(mv&&by[n.par]){p.x=by[n.par].x+rnd()*40;p.y=by[n.par].y+rnd()*40;p.vx=p.vy=0;fresh++}return}
+  const par=by[n.par];let x=0,y=0;
+  if(n.d==1){const m=MP[n.key]||[rnd(),rnd()];x=m[0]*300;y=m[1]*260}
+  else if(par){const an=Math.atan2(par.y,par.x)+rnd()*2.2,r=n.d==2?110:60;x=par.x+Math.cos(an)*r;y=par.y+Math.sin(an)*r}
+  by[n.key]=Object.assign(n,{x,y,vx:0,vy:0});fresh++});
+ if(L.length!=G.nodes.length)G.alpha=Math.max(G.alpha,.2);G.nodes=L.map(n=>by[n.key]);G.dirty=true;G.by=by;G.nodes.forEach(n=>{n.kids=[];n.parent=by[n.par]||null});G.nodes.forEach(n=>{if(n.parent)n.parent.kids.push(n)});
+ G.nodes.forEach(n=>{n.desc=0});[...G.nodes].sort((a,b)=>b.d-a.d).forEach(n=>{if(n.parent)n.parent.desc+=1+n.desc});
+ if(fresh){G.alpha=Math.max(G.alpha,fresh>20?1:.35);if(!G.built){for(let i=0;i<320;i++)nxTick();G.built=true;G.need=true}}}
+/* Physik: Abstoßung, Federn, leichte Schwerkraft zur Mitte */
+const CH=[-2600,-1400,-460,-190],LEN=[0,300,120,62];
+function nxTick(){const N=G.nodes,a=G.alpha;if(a<.004)return;
+ for(let i=0;i<N.length;i++){const p=N[i];for(let j=i+1;j<N.length;j++){const q=N[j];let dx=q.x-p.x,dy=q.y-p.y,d2=dx*dx+dy*dy;if(d2<1){dx=Math.random()-.5;dy=Math.random()-.5;d2=1}
+  if(d2>360000)continue;const d=Math.sqrt(d2),f=Math.sqrt(CH[p.d]*CH[q.d])/d*a*.05*(p.d==1&&q.d==1?3.2:1);dx/=d;dy/=d;p.vx-=dx*f;p.vy-=dy*f;q.vx+=dx*f;q.vy+=dy*f}}
+ N.forEach(n=>{const p=n.parent;if(!p)return;const dx=n.x-p.x,dy=n.y-p.y,d=Math.hypot(dx,dy)||1,L0=LEN[n.d]+(n.d==3?Math.sqrt(p.kids.length)*6:n.d==2?Math.sqrt(n.desc)*10:Math.sqrt(n.desc)*14),k=(d-L0)/d*a*.18;
+  n.vx-=dx*k;n.vy-=dy*k;if(p.d>0){p.vx+=dx*k*.35;p.vy+=dy*k*.35}});
+ N.forEach(n=>{if(n.d==0||n===G.drag?.n){n.vx=n.vy=0;if(n.d==0){n.x=n.y=0}return}n.vx-=n.x*.002*a;n.vy-=n.y*.002*a;n.vx*=.55;n.vy*=.55;n.x+=n.vx;n.y+=n.vy});
+ G.alpha*=.985}
+/* Zoom-Stufen: wie weit die Unterpunkte aufgeklappt sind (0 = im Oberpunkt versteckt, 1 = eigener Punkt) */
+const zRel=()=>G.cam.k/G.fitK;
+function nxOpen(n){const z=zRel();if(n.d<=1)return 1;if(n.d==2)return sst(1.0,1.45,z);return n.parent&&n.parent.d==1?sst(1.3,1.9,z):sst(2.1,3,z)}
+function nxPos(n){if(n._f===G.frame)return n;n._f=G.frame;if(!n.parent){n.px=n.x;n.py=n.y;n.op=1;return n}const p=nxPos(n.parent),o=nxOpen(n)*p.op;n.op=o;n.px=p.px+(n.x-n.parent.x)*o;n.py=p.py+(n.y-n.parent.y)*o;return n}
+function nxR(n){const hid=n.kids.reduce((s,c)=>s+(1-c.op)*(1+c.desc),0);return n.d==0?24:n.d==1?9+2.8*Math.sqrt(hid):n.d==2?6+1.6*Math.sqrt(hid):4.2}
+function nxFit(){const W=G.W,H=G.H;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;G.nodes.filter(n=>n.d<=1).forEach(n=>{x0=Math.min(x0,n.x);x1=Math.max(x1,n.x);y0=Math.min(y0,n.y);y1=Math.max(y1,n.y)});
+ const k=Math.min((W-(W<560?110:220))/Math.max(200,x1-x0),(H-150)/Math.max(200,y1-y0));G.fitK=k;return{x:(x0+x1)/2,y:(y0+y1)/2,k:k*1.02}}
+function nxGo(x,y,k){G.dirty=true;G.tgt={x,y,k:Math.max(G.fitK*.6,Math.min(G.fitK*9,k))}}
+const toS=(x,y)=>[(x-G.cam.x)*G.cam.k+G.W/2,(y-G.cam.y)*G.cam.k+G.H/2],toW=(sx,sy)=>[(sx-G.W/2)/G.cam.k+G.cam.x,(sy-G.H/2)/G.cam.k+G.cam.y];
+function nxFrame(t){requestAnimationFrame(nxFrame);const cv=$('nexus');if(!cv||!G.nodes.length)return;
+ const W=cv.clientWidth;if(!W)return;const SM=W<560,H=Math.round(SM?Math.min(560,W*1.3):Math.min(640,W*.62)),dpr=Math.min(devicePixelRatio||1,2);
  if(cv.width!=W*dpr||cv.height!=H*dpr){cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+'px'}
- const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);const T=TH();
- const dt=Math.min(50,t-(NX.last||t));NX.last=t;NX.k+=((NX.sel?1:0)-NX.k)*Math.min(1,dt*.008);const kk=ease(Math.max(0,Math.min(1,NX.k)));
- const K=Math.max(.74,Math.min(1,W/760)),FK=SM?1:Math.max(1,Math.min(1.15,W/850)),cx=W/2,cy=H/2,RY=H*(SM?.42:.38),RX=SM?W*.37:Math.min(W*.38,RY*1.55),F='JetBrains Mono,ui-monospace,monospace';NX.hits=[];
- NX.dust.forEach(d=>{x.fillStyle=`rgba(170,195,205,${d[3]*(.3+.2*Math.sin(t/1200+d[2]))})`;x.fillRect(d[0]*W,d[1]*H,1,1)});
- // Kompass-Ring
- const CR=SM?Math.min(W*.49,H*.47):Math.min(W*.48,H*.49);x.strokeStyle=hexA(T.br,.35);x.lineWidth=1;x.beginPath();x.arc(cx,cy,CR,0,7);x.stroke();
- x.setLineDash([2,7]);x.strokeStyle=hexA(T.br,.3);x.beginPath();x.arc(cx,cy,CR*.62,0,7);x.stroke();x.setLineDash([]);
- const rot=t/240000;for(let a=0;a<72;a++){const an=a/72*6.283+rot,r1=CR,r2=CR-(a%9?3:7);x.strokeStyle=hexA(T.br,a%9?.25:.6);x.beginPath();x.moveTo(cx+r1*Math.cos(an),cy+r1*Math.sin(an));x.lineTo(cx+r2*Math.cos(an),cy+r2*Math.sin(an));x.stroke();
-  if(a%9==0&&!SM){x.fillStyle=hexA(T.mu,.6);x.font=`10px ${F}`;x.textAlign='center';x.textBaseline='middle';x.fillText(String(Math.round(a*5)).padStart(3,'0'),cx+(CR-16)*Math.cos(an),cy+(CR-16)*Math.sin(an))}}
- const M=MODS(),S=NX.sel?M.find(m=>m.id==NX.sel):null;
- const MP={musik:[-.34,-.84],projekte:[.34,-.84],finanzen:[.62,-.18],todos:[.52,.5],kalender:[-.52,.5],leben:[-.62,-.18],warten:[0,.86]};M.forEach((m,i)=>{if(SM&&MP[m.id])m.pos=MP[m.id];const dx=Math.sin(t/2600+i*1.3)*3,dy=Math.cos(t/2900+i*.9)*3;m.x=cx+m.pos[0]*RX+dx;m.y=cy+m.pos[1]*RY+dy;
-  const dir=Math.atan2(m.pos[1],m.pos[0]*1.2),n=m.kids.length,sp=SM?(n==2?1.1:.8):(n==2?1.3:m.id=='projekte'?(n==4?.82:1.05):n>3?.78:.66),dist=(SM?26:(n>3||m.id=='projekte'?95:80))*K;
-  m.kids.forEach((k,j)=>{const an=dir+(j-(n-1)/2)*sp;k.x=m.x+Math.cos(an)*dist*(1+.08*Math.sin(t/3100+j))*(SM?1:1.25);k.y=m.y+Math.sin(an)*dist;k.c=k.c||m.c})});
- if(S){S.x+=(cx-S.x)*kk;S.y+=(cy-S.y)*kk}
- const dim=m=>S&&m!==S?1-.86*kk:1;
+ const wasW=G.W;G.W=W;G.H=H;if(G.need||wasW!=W){const r=wasW?zRel():1,f=nxFit();if(G.need){G.cam={x:f.x,y:f.y,k:f.k}}else{G.cam.k=G.fitK*r;if(G.tgt)G.tgt=null}G.home=f;G.need=false;G.dirty=true}
+ if(!(G.alpha>.004||G.tgt||G.drag||G.pinch||G.dirty))return;G.dirty=false;
+ nxTick();if(G.tgt){const c=G.cam,g=G.tgt,e=.16;c.x+=(g.x-c.x)*e;c.y+=(g.y-c.y)*e;c.k*=Math.pow(g.k/c.k,e);if(Math.abs(g.k/c.k-1)<.002&&Math.hypot(g.x-c.x,g.y-c.y)<.5)G.tgt=null}
+ G.frame=(G.frame||0)+1;const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);const T=TH(),F="'Plus Jakarta Sans',Inter,system-ui,sans-serif",k=G.cam.k,z=zRel();
+ const N=G.nodes;N.forEach(nxPos);
+ const hv=G.hover,nb=new Set();if(hv){nb.add(hv);if(hv.parent)nb.add(hv.parent);hv.kids.forEach(c=>nb.add(c))}
+ const dimA=n=>hv?(nb.has(n)?1:.18):1;
  // Linien
- M.forEach((m,i)=>{const al=dim(m);if(m!==S){const[qx,qy]=curve(cx,cy,m.x,m.y,.08);x.strokeStyle=hexA(T.br,.45*al);x.lineWidth=1;x.beginPath();x.moveTo(cx,cy);x.quadraticCurveTo(qx,qy,m.x,m.y);x.stroke();
-   for(let p=0;p<2;p++){const f=((t/4200)+i*.13+p*.5)%1,[px,py]=qpt(cx,cy,qx,qy,m.x,m.y,f);x.fillStyle=hexA(m.c,.8*al);x.beginPath();x.arc(px,py,1.6,0,7);x.fill()}}
-  if(!(m===S&&kk>.3))m.kids.forEach((k,j)=>{const[qx,qy]=curve(m.x,m.y,k.x,k.y,.12);x.strokeStyle=hexA(T.br,.4*al);x.beginPath();x.moveTo(m.x,m.y);x.quadraticCurveTo(qx,qy,k.x,k.y);x.stroke();
-   const f=((t/3000)+j*.31+i*.07)%1,[px,py]=qpt(m.x,m.y,qx,qy,k.x,k.y,f);x.fillStyle=hexA(k.c,.7*al);x.beginPath();x.arc(px,py,1.2,0,7);x.fill()})});
- // Kern
- const sc=score(),cr=(SM?30:40)*K;if(kk<.98){x.globalAlpha=1-kk;
-  const cg=x.createRadialGradient(cx,cy,0,cx,cy,cr*2.2);cg.addColorStop(0,hexA(T.amb,.14));cg.addColorStop(1,hexA(T.amb,0));x.fillStyle=cg;x.beginPath();x.arc(cx,cy,cr*2.2,0,7);x.fill();
-  x.fillStyle='rgba(6,10,13,.95)';x.beginPath();x.arc(cx,cy,cr,0,7);x.fill();
-  [cr*.72,cr*.55].forEach((r,i)=>{x.strokeStyle=hexA(T.amb,.18);x.lineWidth=1;x.setLineDash(i?[2,4]:[]);x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();x.setLineDash([])});
-  x.strokeStyle=hexA(T.amb,.15);x.lineWidth=4;x.beginPath();x.arc(cx,cy,cr+4,0,7);x.stroke();
-  x.strokeStyle=T.amb;x.shadowColor=T.amb;x.shadowBlur=12;x.lineWidth=4;x.beginPath();x.arc(cx,cy,cr+4,-Math.PI/2,-Math.PI/2+Math.max(.02,sc/100)*6.283);x.stroke();x.shadowBlur=0;
-  x.fillStyle=T.amb;x.textAlign='center';x.textBaseline='middle';x.font=`500 ${Math.round(cr*.8)}px ${F}`;x.fillText(sc,cx,cy-cr*.08);
-  x.fillStyle=hexA(T.mu,.9);x.font=`${Math.max(9,Math.round(cr*.2))}px ${F}`;x.fillText('LIFE SCORE',cx,cy+cr*.45);x.globalAlpha=1}
- // Knoten
- const lab=(X,Y,a,b,col,al,big)=>{x.globalAlpha=al;x.textAlign='center';x.textBaseline='top';x.font=`${big?600:500} ${Math.round((big?(SM?11.5:13.5):(SM?9.5:11))*FK)}px ${F}`;x.fillStyle=big?T.tx:hexA(T.tx,.78);x.fillText(a,X,Y);
-  if(b&&!(SM&&!big)){x.font=`${Math.round((big?(SM?10.5:12):10.5)*FK)}px ${F}`;x.fillStyle=big?col:hexA(T.mu2||'#8a9ca2',1);x.fillText(b,X,Y+(big?(SM?14:17):14)*FK)}x.globalAlpha=1};
- M.forEach((m,i)=>{const al=dim(m),r=(m===S?15+5*kk:14)*K;
-  if(!(m===S&&kk>.3))m.kids.forEach((k,j)=>{hexNode(x,k.x,k.y,(SM?6:8.5)*K,k.c,al,t,i*3+j,false);if(!SM)lab(k.x,k.y+11*K,k.n,k.s,k.c,al,false);if(!S)NX.hits.push({type:'hub',id:m.id,sub:k.f||null,x:k.x,y:k.y,r:14*K})});
-  hexNode(x,m.x,m.y,r,m.c,al,t,i,true);if(!(S&&m!==S&&kk>.5))lab(m.x,m.y+r+6*K,m.n,m.sub,m.c,al,true);
-  if(!S||m===S)NX.hits.push({type:'hub',id:m.id,x:m.x,y:m.y,r:Math.max(r+12,22)})});
- // Aufgeklappt: Einträge im Kreis
- if(S&&kk>.15){const L=S.items(),n=L.length,RRy=SM?RY*1.05:RY*.88,RRx=SM?W*.2:Math.min(RX*.62,W/2-190),al=Math.min(1,(kk-.15)/.6),mx=SM?19:30;
-  const half=Math.ceil(n/2);L.forEach((o,k)=>{const an=-Math.PI/2+(k+.5)*6.283/n,rgt=k<half,row=rgt?k:k-half,rows=rgt?half:n-half,px=SM?cx+(rgt?1:-1)*W*.07*kk:cx+Math.cos(an)*RRx*kk,py=SM?cy+((rows>1?row/(rows-1):.5)-.5)*(H-90)*kk:cy+Math.sin(an)*RRy*kk*.95,ca=SM?(rgt?1:-1):Math.cos(an),
-   align=ca>=0?'left':'right',tx=px+(align=='left'?13:-13)*K,ty=py-6*K;
-   x.globalAlpha=al;const[qx,qy]=curve(S.x,S.y,px,py,.06);x.strokeStyle=hexA(T.br,.4);x.lineWidth=1;x.beginPath();x.moveTo(S.x,S.y);x.quadraticCurveTo(qx,qy,px,py);x.stroke();
-   if(o.add){hexPath(x,px,py,8*K);x.strokeStyle=S.c;x.setLineDash([2,3]);x.stroke();x.setLineDash([]);x.fillStyle=S.c;x.font=`500 ${Math.round(11*K)}px ${F}`;x.textAlign='center';x.textBaseline='middle';x.fillText('+',px,py+1);
-    x.textAlign=align;x.textBaseline='top';x.font=`${SM?11:13}px ${F}`;x.fillText('NEU',tx,ty)}
-   else{hexNode(x,px,py,8*K,o.c,al*(o.done?.5:1),t,k,false);if(o.done){x.fillStyle=T.ok;x.font=`700 ${Math.round(10*K)}px ${F}`;x.textAlign='center';x.textBaseline='middle';x.fillText('✓',px,py+.5)}
-    x.textAlign=align;x.textBaseline='top';x.font=`${SM?11:13}px ${F}`;x.fillStyle=o.done?hexA(T.mu,1):hexA(T.tx,.92);let tt=o.t;if(tt.length>mx)tt=tt.slice(0,mx-1)+'…';x.fillText(tt,tx,ty);
-    if(o.s){x.font=`${SM?10:11.5}px ${F}`;x.fillStyle=hexA(o.c,.95);x.fillText(o.s,tx,ty+(SM?13:16))}}
-   x.globalAlpha=1;const tw=SM?140:250;NX.hits.push({type:'item',o,x:px,y:py,r:14*K,lx:align=='left'?tx:align=='right'?tx-tw:tx-tw/2,ly:ty-2,lw:tw,lh:SM?28:32})})}
- // HUD
- x.font=`${SM?9.5:11}px ${F}`;x.textBaseline='top';x.textAlign='left';x.fillStyle=hexA(T.mu,1);const nodes=M.length+M.reduce((s,m)=>s+m.kids.length,0);x.fillText(`NODES ${nodes} · LINKS ${nodes}`,6,4);
- x.textAlign='right';x.fillStyle=T.cy;x.fillText('● LIVE',W-6,4);x.fillStyle=hexA(T.mu,1);if(!SM)x.fillText(S?S.n+' · OFFEN':'LIFE · NEXUS',W-6,19);
- if(!S&&!SM){const hl=D.hlog[WK]||{},hd=D.habits.reduce((s,h)=>s+Math.min((hl[h.id]||[]).filter(Boolean).length,h.goal),0),hg=D.habits.reduce((s,h)=>s+h.goal,0),td=D.todos.filter(o=>o.done).length;
-  const bars=[['TO-DOS',td,D.todos.length||1],['SCORE',sc,100]];x.textAlign='left';x.textBaseline='middle';
-  bars.forEach(([l,v,m],i)=>{const y=H-10-(bars.length-1-i)*(SM?13:15);x.fillStyle=hexA(T.mu,1);x.fillText(l,6,y);x.fillStyle=hexA(T.br,.4);const bx=SM?66:82;x.fillRect(bx,y-1,58,2.5);x.fillStyle=T.ok;x.fillRect(bx,y-1,58*Math.min(1,v/m),2.5);x.fillStyle=hexA(T.mu,1);x.fillText(`${v}/${m}`,bx+64,y)})}
- x.textAlign='right';x.textBaseline='bottom';x.fillStyle=hexA(T.mu,1);x.fillText(S?'MITTE = ZURÜCK':'ANTIPPEN = ÖFFNEN',W-6,H-4);
-}
+ x.lineWidth=1;N.forEach(n=>{if(!n.parent||n.op<.02)return;const[a,b]=toS(n.parent.px,n.parent.py),[c,d]=toS(n.px,n.py);const lit=hv&&(n===hv||n.parent===hv);
+  x.strokeStyle=lit?hexA(n.c,.85):hexA(T.br,(n.d==1?.55:.42)*Math.min(dimA(n),dimA(n.parent))*n.op);x.lineWidth=lit?1.6:1;x.beginPath();x.moveTo(a,b);x.lineTo(c,d);x.stroke()});
+ // Punkte
+ G.hits=[];const order=[...N].sort((a,b)=>b.d-a.d),boxes=[];
+ order.forEach(n=>{if(n.op<.05||n.d==0)return;const[sx,sy]=toS(n.px,n.py);if(sx<-60||sy<-60||sx>W+60||sy>H+60)return;
+  const r=Math.max(n.d==3?2.6:4,nxR(n)*Math.pow(k,.75)*(n===hv?1.25:1)),al=n.op*dimA(n);
+  const g=x.createRadialGradient(sx,sy,0,sx,sy,r*3);g.addColorStop(0,hexA(n.c,.28*al));g.addColorStop(1,hexA(n.c,0));x.fillStyle=g;x.beginPath();x.arc(sx,sy,r*3,0,7);x.fill();
+  x.fillStyle=hexA(n.c,al);x.beginPath();x.arc(sx,sy,r,0,7);x.fill();
+  if(n.d<3){x.strokeStyle=hexA('#ffffff',.25*al);x.lineWidth=1;x.beginPath();x.arc(sx,sy,r,0,7);x.stroke()}
+  if(n.op>.6)G.hits.push({n,x:sx,y:sy,r:Math.max(r+5,n.d==3?11:16)});
+  // Beschriftung
+  const showL=n.d==1?1:n.d==2?sst(.55,.9,n.op):Math.max(sst(.75,1,n.op)*(n.parent.d==1?sst(1.9,2.5,z):sst(2.8,3.6,z)),n===hv?1:0);
+  const la=Math.min(1,showL)*(hv&&!nb.has(n)?.15:1);if(la<.03)return;
+  const fs=n.d==1?(SM?12:13.5):n.d==2?(SM?11:12):(SM?10.5:11.5);x.globalAlpha=la;x.textAlign='center';x.textBaseline='top';
+  let tt=String(n.n||'');const mx=n===hv?48:n.d==3?26:30;if(tt.length>mx)tt=tt.slice(0,mx-1)+'…';
+  x.font=`${n.d==1?800:n.d==2?700:500} ${fs}px ${F}`;const bw=x.measureText(tt).width,bx={l:sx-bw/2-3,r:sx+bw/2+3,t:sy+r+4,b:sy+r+6+fs*2.2};if(n.d==3&&n!==hv&&boxes.some(q=>q.l<bx.r&&q.r>bx.l&&q.t<bx.b&&q.b>bx.t)){x.globalAlpha=1;return}boxes.push(bx);x.fillStyle=n.d==3?hexA(T.tx,.86):T.tx;x.fillText(tt,sx,sy+r+5);
+  const showS=n.d==1?(1-sst(.3,.9,n.kids.length?n.kids[0].op:0))*.9+.1:n.d==2?1-sst(.4,.9,n.kids.length?n.kids[0].op:0):n===hv?1:sst(5,6.5,z)*sst(.75,1,n.op);
+  if(n.s&&showS>.05){x.globalAlpha=la*showS;x.font=`600 ${fs-1.5}px ${F}`;x.fillStyle=n.c;let ss=String(n.s);if(ss.length>34)ss=ss.slice(0,33)+'…';x.fillText(ss,sx,sy+r+5+fs+3)}
+  x.globalAlpha=1});
+ // Mitte: Life Score
+ {const n=G.by.root,[sx,sy]=toS(0,0),cr=Math.max(16,24*Math.pow(k,.75)),sc=score(),al=hv&&!nb.has(n)?.3:1;x.globalAlpha=al;
+  const cg=x.createRadialGradient(sx,sy,0,sx,sy,cr*2.4);cg.addColorStop(0,hexA(T.amb,.16));cg.addColorStop(1,hexA(T.amb,0));x.fillStyle=cg;x.beginPath();x.arc(sx,sy,cr*2.4,0,7);x.fill();
+  x.fillStyle=T.panel;x.beginPath();x.arc(sx,sy,cr,0,7);x.fill();x.strokeStyle=hexA(T.amb,.18);x.lineWidth=3;x.beginPath();x.arc(sx,sy,cr+3,0,7);x.stroke();
+  x.strokeStyle=T.amb;x.lineWidth=3;x.beginPath();x.arc(sx,sy,cr+3,-Math.PI/2,-Math.PI/2+Math.max(.02,sc/100)*6.283);x.stroke();
+  x.fillStyle=T.amb;x.textAlign='center';x.textBaseline='middle';x.font=`800 ${Math.round(cr*.78)}px ${F}`;x.fillText(sc,sx,sy-cr*.1);x.fillStyle=hexA(T.mu,1);x.font=`700 ${Math.max(7,Math.round(cr*.22))}px ${F}`;x.fillText('SCORE',sx,sy+cr*.42);x.globalAlpha=1;
+  G.hits.push({n,x:sx,y:sy,r:cr+6})}
+ // Anzeige: Zoom-Stufe
+ const lv=z<1.2?0:z<2.6?1:2,el=$('nxlvl');if(el&&el.dataset.l!=lv){el.dataset.l=lv;el.innerHTML=['<b>Übersicht</b> · reinzoomen für mehr','<b>Bereiche</b> · weiter reinzoomen für Einzelpunkte','<b>Details</b> · Punkt antippen zum Öffnen'][lv]}
+ if(G.drag&&!G.drag.n)cv.style.cursor='grabbing'}
 requestAnimationFrame(nxFrame);
-function bindNexus(){const cv=$('nexus');
- const find=e=>{const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;return NX.hits.slice().reverse().find(h=>Math.hypot(h.x-mx,h.y-my)<h.r||(h.lw&&mx>=h.lx&&mx<=h.lx+h.lw&&my>=h.ly&&my<=h.ly+h.lh))};
- cv.onpointermove=e=>{cv.style.cursor=find(e)?'pointer':'default'};
- cv.onclick=e=>{const h=find(e);
-  const stepBack=()=>{if(NX.sel=='projekte'&&NX.sub){NX.sub=null;return true}return false};
-  if(!h){if(stepBack())return;if(NX.sel){NX.sel=null;NX.sub=null;clearJust()}return}
-  if(h.type=='hub'){if(NX.sel==h.id&&stepBack())return;if(NX.sel==h.id){NX.sel=null;NX.sub=null;clearJust()}else{clearJust();NX.sel=h.id;NX.sub=h.sub||null}return}
-  const o=h.o;
-  if(o.add){capArea=null;const q=$('qi');q.placeholder='Neues To-do … & Enter';q.focus();q.scrollIntoView({block:'center',behavior:'smooth'})}
-  else if(o.todo){const td=D.todos.find(x=>x.id==o.todo);if(!tick(td))td._just=true;save();refreshSide()}
-  else if(o.hab){const L=D.hlog[WK]=D.hlog[WK]||{};const r=L[o.hab]=L[o.hab]||[0,0,0,0,0,0,0];r[todayIdx]=r[todayIdx]?0:1;save();refreshSide()}
-  else if(o.area){rateSheet(o.area)}
-  else if(o.go)o.go()};
+function nxHit(mx,my){let best=null,bd=1e9;(G.hits||[]).forEach(h=>{const d=Math.hypot(h.x-mx,h.y-my);if(d<h.r&&d<bd){bd=d;best=h.n}});return best}
+function nxZoomAt(sx,sy,f){const[wx,wy]=toW(sx,sy),k=Math.max(G.fitK*.6,Math.min(G.fitK*9,G.cam.k*f));G.cam.k=k;G.cam.x=wx-(sx-G.W/2)/k;G.cam.y=wy-(sy-G.H/2)/k;G.tgt=null;G.dirty=true}
+function nxClick(n){if(!n)return;if(n.act.fit){const h=nxFit();nxGo(h.x,h.y,h.k);return}
+ if(n.act.go){n.act.go();return}
+ const p=nxPos(n),hasLeaves=n.kids.some(c=>c.d==3),want=n.d==1?(hasLeaves?2.7:1.9):3.9;nxGo(p.x,p.y,G.fitK*Math.max(want,zRel()))}
+function bindNexus(){const cv=$('nexus');if(!cv)return;G.hover=null;G.dirty=true;try{nxSync()}catch(e){console.error('Nexus',e)}
+ const pos=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
+ cv.onpointerdown=e=>{const[mx,my]=pos(e);G.ptr.set(e.pointerId,[mx,my]);try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  if(G.ptr.size==2){const[a,b]=[...G.ptr.values()];G.pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]),m:[(a[0]+b[0])/2,(a[1]+b[1])/2]};G.drag=null;G.moved=true;return}
+  const n=nxHit(mx,my),dn=n&&n.d>0?n:null;G.drag={n:dn,nx:dn?dn.x:null,ny:dn?dn.y:null,sx:mx,sy:my,cx:G.cam.x,cy:G.cam.y};G.moved=false;G.tap=false};
+ cv.onpointermove=e=>{const[mx,my]=pos(e);if(G.ptr.has(e.pointerId))G.ptr.set(e.pointerId,[mx,my]);
+  if(G.pinch&&G.ptr.size==2){const[a,b]=[...G.ptr.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]),m=[(a[0]+b[0])/2,(a[1]+b[1])/2];nxZoomAt(m[0],m[1],d/G.pinch.d);
+   G.cam.x-=(m[0]-G.pinch.m[0])/G.cam.k;G.cam.y-=(m[1]-G.pinch.m[1])/G.cam.k;G.pinch={d,m};return}
+  const D0=G.drag;if(D0){if(!G.moved&&Math.hypot(mx-D0.sx,my-D0.sy)>5)G.moved=true;
+   if(G.moved){if(D0.n){const[wx,wy]=toW(mx,my),p=D0.n,dx=wx-p.px,dy=wy-p.py;p.x+=dx;p.y+=dy;G.alpha=Math.max(G.alpha,.3)}else{G.cam.x=D0.cx-(mx-D0.sx)/G.cam.k;G.cam.y=D0.cy-(my-D0.sy)/G.cam.k;G.tgt=null}}return}
+  if(e.pointerType=='mouse'){const h=nxHit(mx,my);if(h!==G.hover){G.hover=h;G.dirty=true}cv.style.cursor=h?'pointer':'grab'}};
+ const up=e=>{G.ptr.delete(e.pointerId);if(G.pinch){if(G.ptr.size<2)G.pinch=null;G.drag=null;return}
+  const D0=G.drag;G.drag=null;G.dirty=true;if(e.type=='pointercancel'&&D0){if(D0.n&&D0.nx!=null){D0.n.x=D0.nx;D0.n.y=D0.ny}else{G.cam.x=D0.cx;G.cam.y=D0.cy}G.tap=false;return}
+  G.tap=e.type=='pointerup'&&D0&&!G.moved;if(D0&&D0.n&&G.moved)G.alpha=Math.max(G.alpha,.25)};
+ cv.onclick=e=>{if(!G.tap)return;G.tap=false;const[mx,my]=pos(e);nxClick(nxHit(mx,my))};
+ cv.onpointerup=up;cv.onpointercancel=up;cv.onpointerleave=e=>{if(e.pointerType=='mouse'&&!G.drag){G.hover=null;G.dirty=true}};
+ cv.onwheel=e=>{const f=Math.exp(-e.deltaY*(e.ctrlKey?.01:.0016)),k=G.cam.k;if((f>1&&k>=G.fitK*9*.999)||(f<1&&k<=G.fitK*.6*1.001))return;e.preventDefault();const[mx,my]=pos(e);nxZoomAt(mx,my,f)};
+ cv.ondblclick=e=>{const[mx,my]=pos(e);if(!nxHit(mx,my)){const h=nxFit();nxGo(h.x,h.y,h.k)}};
+ document.querySelectorAll('[data-nz]').forEach(b=>b.onclick=()=>{const z=b.dataset.nz;if(z=='fit'){const h=nxFit();nxGo(h.x,h.y,h.k)}else{const f=z=='in'?1.4:1/1.4;nxGo(G.cam.x,G.cam.y,G.cam.k*f)}});
 }
+
 function clearJust(){D.todos.forEach(o=>delete o._just);refreshSide()}
 function refreshSide(){if(view!='start')return;const el=$('tdbox');if(el)el.innerHTML=todoPanel();bindStart()}
 function rateSheet(id){const a=AR(id);sheet(`<div class="row"><b style="font-size:17px">${a.i} ${esc(a.n)}</b><button class="x" id="cl">✕</button></div>${rated(id).length?`<div style="font-size:12.5px;color:var(--mu);margin:6px 0">Berechnet aus ${rated(id).length} fertigen Projekt${rated(id).length>1?'en':''}: ${rated(id).map(p=>remo(p.rate)+' '+esc(p.t)).join(' · ')}. Der nächste Projektabschluss rechnet neu.</div>`:`<div style="font-size:12.5px;color:var(--mu);margin:6px 0">Noch kein fertiges Projekt hier bewertet. Sobald du eins abschließt, berechnet sich der Wert automatisch.</div>`}<label>Wie zufrieden bist du gerade? (1–10)</label><div class="seg">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button data-sc="${n}" style="${n==a.s?`background:${a.c};color:#05080a;font-weight:600`:''}">${n}</button>`).join('')}</div>`);
@@ -364,7 +426,7 @@ function habToday(){return D.habits.map(h=>{const d=habDone(h),ic=(h.t.match(/^\
 function bindStart(){bindTodos();document.querySelectorAll('[data-ht]').forEach(b=>b.onclick=()=>{const L=D.hlog[WK]=D.hlog[WK]||{};const r=L[b.dataset.ht]=L[b.dataset.ht]||[0,0,0,0,0,0,0];r[todayIdx]=r[todayIdx]?0:1;save();refreshSide()})}
 function vStart(){
  const t=ftot(),o=open();
- $('v').innerHTML=`${heutePanel()}<div class="card nx mt"><h2 style="padding:2px 4px 0"><span><i class="ico" style="--c:var(--h-leben)">◈</i>Neural Nexus</span><button id="rev">Wochen-Check-in ↻</button></h2><canvas id="nexus"></canvas></div>
+ $('v').innerHTML=`${heutePanel()}<div class="card nx mt"><h2 style="padding:2px 4px 0"><span><i class="ico" style="--c:var(--h-leben)">◈</i>Neural Nexus</span><button id="rev">Wochen-Check-in ↻</button></h2><div class="nxw"><canvas id="nexus"></canvas><div class="nxlvl" id="nxlvl"></div><div class="nxz"><button data-nz="in" title="Reinzoomen">+</button><button data-nz="out" title="Rauszoomen">−</button><button data-nz="fit" title="Alles zeigen">⤢</button></div><div class="nxh">Mausrad / zwei Finger = Zoom · Ziehen = Bewegen · Antippen = Öffnen</div></div></div>
  <div class="card mt"><h2><span><i class="ico" style="--c:var(--h-todos)">✓</i>To-dos</span><span class="r">${o.length} offen · <span style="color:var(--p1)">${o.filter(x=>x.p==1).length} mit hoher Priorität</span></span></h2><div id="tdbox">${todoPanel()}</div></div>
  <div class="grid mt">${tracksPanel()}${waitPanel()}</div>
  <div class="grid mt"><div class="card"><h2><span><i class="ico" style="--c:var(--h-kalender)">▦</i>Als Nächstes</span><a href="#kalender">Kalender →</a></h2>${upcoming(5).map(evRow).join('')}</div>
@@ -424,19 +486,19 @@ function vFin(){
  document.querySelectorAll('[data-tg]').forEach(b=>b.onclick=e=>{e.stopPropagation();const x=D.fin[ftab].find(i=>i.id==b.dataset.tg);x.on=!x.on;render();save()});
  document.querySelectorAll('[data-fid]').forEach(b=>b.onclick=()=>finSheet(+b.dataset.fid));$('fadd').onclick=()=>finSheet(0);
 }
-function finSheet(id){const x=id?D.fin[ftab].find(i=>i.id==id):null;
+function finSheet(id,tab=ftab){const x=id?D.fin[tab].find(i=>i.id==id):null;
  const f=(k,l,type='text')=>`<label>${l}</label><input id="f_${k}" type="${type}" ${type=='number'?'step="0.01" inputmode="decimal"':''} value="${esc(x?x[k]??'':'')}">`;
- let h=`<div class="row"><b style="font-size:18px">${x?'Bearbeiten':'Neu'} – ${ftab=='monat'?'Fixkosten':ftab=='einnahmen'?'Einnahme':'Jahres-Abo'}</b><button class="x" id="cl">✕</button></div>`+f('name','Name')+f('b',ftab=='jaehrlich'?'Betrag pro Jahr (€)':'Betrag pro Monat (€)','number');
- if(ftab=='monat')h+=`<div class="g2"><div><label>Kategorie</label><select id="f_cat">${Object.keys(CATS).map(c=>`<option ${x&&x.cat==c?'selected':''}>${c}</option>`).join('')}</select></div><div>${f('tag','Abbuchung am')}</div></div>`+f('zahl','Zahlart / Anbieter')+`<label>Raten: noch wie viele Monate? (leer = läuft unbegrenzt)</label><div class="g2"><input id="f_rm" type="number" inputmode="numeric" placeholder="z. B. 24" value="${x&&x.bis&&left(x)>0?left(x):''}"><input id="f_bis" type="month" value="${x&&x.bis?x.bis:''}"></div>`;
- if(ftab=='jaehrlich')h+=`<div class="g2"><div>${f('tag','Fällig am')}</div><div>${f('zahl','Zahlart')}</div></div>`;
+ let h=`<div class="row"><b style="font-size:18px">${x?'Bearbeiten':'Neu'} – ${tab=='monat'?'Fixkosten':tab=='einnahmen'?'Einnahme':'Jahres-Abo'}</b><button class="x" id="cl">✕</button></div>`+f('name','Name')+f('b',tab=='jaehrlich'?'Betrag pro Jahr (€)':'Betrag pro Monat (€)','number');
+ if(tab=='monat')h+=`<div class="g2"><div><label>Kategorie</label><select id="f_cat">${Object.keys(CATS).map(c=>`<option ${x&&x.cat==c?'selected':''}>${c}</option>`).join('')}</select></div><div>${f('tag','Abbuchung am')}</div></div>`+f('zahl','Zahlart / Anbieter')+`<label>Raten: noch wie viele Monate? (leer = läuft unbegrenzt)</label><div class="g2"><input id="f_rm" type="number" inputmode="numeric" placeholder="z. B. 24" value="${x&&x.bis&&left(x)>0?left(x):''}"><input id="f_bis" type="month" value="${x&&x.bis?x.bis:''}"></div>`;
+ if(tab=='jaehrlich')h+=`<div class="g2"><div>${f('tag','Fällig am')}</div><div>${f('zahl','Zahlart')}</div></div>`;
  h+=`<div class="row" style="margin-top:12px">${x?'<button class="btn g" id="del" style="color:var(--red)">Löschen</button>':'<span></span>'}<button class="btn" id="ok">Speichern</button></div>`;
  sheet(h);$('cl').onclick=close;
  const rm=$('f_rm'),bi=$('f_bis');if(rm){rm.oninput=()=>{const n=parseInt(rm.value);bi.value=n>0?plusM(n):''};bi.oninput=()=>{rm.value=bi.value&&left({bis:bi.value})>0?left({bis:bi.value}):''}}
- if(x)$('del').onclick=()=>{if($('del').dataset.c){D.fin[ftab]=D.fin[ftab].filter(i=>i!==x);close();render();save()}else{$('del').dataset.c=1;$('del').textContent='Wirklich löschen?'}};
+ if(x)$('del').onclick=()=>{if($('del').dataset.c){D.fin[tab]=D.fin[tab].filter(i=>i!==x);close();render();save()}else{$('del').dataset.c=1;$('del').textContent='Wirklich löschen?'}};
  $('ok').onclick=()=>{const g=k=>{const e=$('f_'+k);return e?e.value.trim():undefined};const o=x||{id:Date.now(),on:true};
   o.name=g('name')||'Ohne Namen';o.b=parseFloat((g('b')||'0').replace(',','.'))||0;
-  if(ftab=='monat'){o.cat=g('cat');o.tag=g('tag');o.zahl=g('zahl');o.bis=g('bis')||null}if(ftab=='jaehrlich'){o.tag=g('tag');o.zahl=g('zahl')}
-  if(!x)D.fin[ftab].push(o);close();render();save()};
+  if(tab=='monat'){o.cat=g('cat');o.tag=g('tag');o.zahl=g('zahl');o.bis=g('bis')||null}if(tab=='jaehrlich'){o.tag=g('tag');o.zahl=g('zahl')}
+  if(!x)D.fin[tab].push(o);close();render();save()};
 }
 
 function vMusik(){
