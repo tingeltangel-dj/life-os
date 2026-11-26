@@ -147,6 +147,7 @@ function hexNode(x,X,Y,r,c,al,t,seed,big){const pul=.85+.15*Math.sin(t/900+seed)
 function curve(x0,y0,x1,y1,b){const mx=(x0+x1)/2,my=(y0+y1)/2,dx=x1-x0,dy=y1-y0;return[mx-dy*b,my+dx*b]}
 function qpt(x0,y0,cx,cy,x1,y1,f){const u=1-f;return[u*u*x0+2*u*f*cx+f*f*x1,u*u*y0+2*u*f*cy+f*f*y1]}
 /* ---------- Neural Nexus als Graph (wie Obsidian): zoomen, Unterpunkte klappen beim Rauszoomen in den Oberpunkt ---------- */
+const mixC=(a,b,t)=>{const p=parseInt(a.slice(1),16),q=parseInt(b.slice(1),16),m=(s)=>Math.round(((p>>s)&255)*(1-t)+((q>>s)&255)*t);return '#'+((1<<24)|(m(16)<<16)|(m(8)<<8)|m(0)).toString(16).slice(1)};
 const sst=(a,b,v)=>{const t=Math.max(0,Math.min(1,(v-a)/(b-a)));return t*t*(3-2*t)};
 const G={nodes:[],by:{},cam:{x:0,y:0,k:.6},tgt:null,fitK:.6,alpha:1,W:0,H:0,hover:null,drag:null,ptr:new Map(),pinch:null,moved:false,built:false};
 /* Baum aus den Daten bauen: Mitte → Bereiche → Gruppen → einzelne Punkte */
@@ -197,86 +198,89 @@ function nxSync(){const L=nxTree(),old=G.by,by={},rnd=()=>Math.random()-.5;let f
  G.nodes.forEach(n=>{n.desc=0});[...G.nodes].sort((a,b)=>b.d-a.d).forEach(n=>{if(n.parent)n.parent.desc+=1+n.desc});
  if(fresh){G.alpha=Math.max(G.alpha,fresh>20?1:.35);if(!G.built){for(let i=0;i<320;i++)nxTick();G.built=true;G.need=true}}}
 /* Physik: Abstoßung, Federn, leichte Schwerkraft zur Mitte */
-const CH=[-2600,-1400,-460,-190],LEN=[0,300,120,62];
+const CH=[-2600,-1500,-170,-80],LEN=[0,250,58,40],chg=n=>CH[n.d]*(n.d==2?1+n.desc*.3:1);
 function nxTick(){const N=G.nodes,a=G.alpha;if(a<.004)return;
  for(let i=0;i<N.length;i++){const p=N[i];for(let j=i+1;j<N.length;j++){const q=N[j];let dx=q.x-p.x,dy=q.y-p.y,d2=dx*dx+dy*dy;if(d2<1){dx=Math.random()-.5;dy=Math.random()-.5;d2=1}
-  if(d2>360000)continue;const d=Math.sqrt(d2),f=Math.sqrt(CH[p.d]*CH[q.d])/d*a*.05*(p.d==1&&q.d==1?3.2:1);dx/=d;dy/=d;p.vx-=dx*f;p.vy-=dy*f;q.vx+=dx*f;q.vy+=dy*f}}
- N.forEach(n=>{const p=n.parent;if(!p)return;const dx=n.x-p.x,dy=n.y-p.y,d=Math.hypot(dx,dy)||1,L0=LEN[n.d]+(n.d==3?Math.sqrt(p.kids.length)*6:n.d==2?Math.sqrt(n.desc)*10:Math.sqrt(n.desc)*14),k=(d-L0)/d*a*.18;
+  if(d2>360000)continue;const d=Math.sqrt(d2),f=Math.sqrt(-chg(p)*-chg(q))/d*a*.05*(p.d==1&&q.d==1?3.2:1);dx/=d;dy/=d;p.vx-=dx*f;p.vy-=dy*f;q.vx+=dx*f;q.vy+=dy*f}}
+ N.forEach(n=>{const p=n.parent;if(!p)return;const dx=n.x-p.x,dy=n.y-p.y,d=Math.hypot(dx,dy)||1,L0=LEN[n.d]+(n.d==3?Math.sqrt(p.kids.length)*6:n.d==2?Math.sqrt(n.desc)*11:Math.sqrt(n.desc)*9),k=(d-L0)/d*a*.18;
   n.vx-=dx*k;n.vy-=dy*k;if(p.d>0){p.vx+=dx*k*.35;p.vy+=dy*k*.35}});
  N.forEach(n=>{if(n.d==0||n===G.drag?.n){n.vx=n.vy=0;if(n.d==0){n.x=n.y=0}return}n.vx-=n.x*.002*a;n.vy-=n.y*.002*a;n.vx*=.55;n.vy*=.55;n.x+=n.vx;n.y+=n.vy});
  G.alpha*=.985}
 /* Zoom-Stufen: wie weit die Unterpunkte aufgeklappt sind (0 = im Oberpunkt versteckt, 1 = eigener Punkt) */
-const zRel=()=>G.cam.k/G.fitK;
-function nxOpen(n){const z=zRel();if(n.d<=1)return 1;if(n.d==2)return sst(1.0,1.45,z);return n.parent&&n.parent.d==1?sst(1.3,1.9,z):sst(2.1,3,z)}
+const KREF=1,zRel=()=>G.cam.k,KMAX=()=>Math.max(4.5,G.fitK*3);
+function nxOpen(n){const z=zRel();if(n.d<=1)return 1;if(n.d==2)return sst(1.0,1.6,z);return n.parent&&n.parent.d==1?sst(1.4,2.0,z):sst(1.8,2.6,z)}
 function nxPos(n){if(n._f===G.frame)return n;n._f=G.frame;if(!n.parent){n.px=n.x;n.py=n.y;n.op=1;return n}const p=nxPos(n.parent),o=nxOpen(n)*p.op;n.op=o;n.px=p.px+(n.x-n.parent.x)*o;n.py=p.py+(n.y-n.parent.y)*o;return n}
 function nxR(n){const hid=n.kids.reduce((s,c)=>s+(1-c.op)*(1+c.desc),0);return n.d==0?24:n.d==1?9+2.8*Math.sqrt(hid):n.d==2?6+1.6*Math.sqrt(hid):4.2}
 function nxFit(){const W=G.W,H=G.H;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;G.nodes.filter(n=>n.d<=1).forEach(n=>{x0=Math.min(x0,n.x);x1=Math.max(x1,n.x);y0=Math.min(y0,n.y);y1=Math.max(y1,n.y)});
  const k=Math.min((W-(W<560?110:220))/Math.max(200,x1-x0),(H-150)/Math.max(200,y1-y0));G.fitK=k;return{x:(x0+x1)/2,y:(y0+y1)/2,k:k*1.02}}
-function nxGo(x,y,k){G.dirty=true;G.tgt={x,y,k:Math.max(G.fitK*.6,Math.min(G.fitK*9,k))}}
+function nxGo(x,y,k){G.zt=null;G.dirty=true;G.tgt={x,y,k:Math.max(G.fitK*.7,Math.min(KMAX(),k))}}
 const toS=(x,y)=>[(x-G.cam.x)*G.cam.k+G.W/2,(y-G.cam.y)*G.cam.k+G.H/2],toW=(sx,sy)=>[(sx-G.W/2)/G.cam.k+G.cam.x,(sy-G.H/2)/G.cam.k+G.cam.y];
 function nxFrame(t){requestAnimationFrame(nxFrame);const cv=$('nexus');if(!cv||!G.nodes.length)return;
  const W=cv.clientWidth;if(!W)return;const SM=W<560,H=Math.round(SM?Math.min(560,W*1.3):Math.min(640,W*.62)),dpr=Math.min(devicePixelRatio||1,2);
  if(cv.width!=W*dpr||cv.height!=H*dpr){cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+'px'}
- const wasW=G.W;G.W=W;G.H=H;if(G.need||wasW!=W){const r=wasW?zRel():1,f=nxFit();if(G.need){G.cam={x:f.x,y:f.y,k:f.k}}else{G.cam.k=G.fitK*r;if(G.tgt)G.tgt=null}G.home=f;G.need=false;G.dirty=true}
- if(!(G.alpha>.004||G.tgt||G.drag||G.pinch||G.dirty))return;G.dirty=false;
- nxTick();if(G.tgt){const c=G.cam,g=G.tgt,e=.16;c.x+=(g.x-c.x)*e;c.y+=(g.y-c.y)*e;c.k*=Math.pow(g.k/c.k,e);if(Math.abs(g.k/c.k-1)<.002&&Math.hypot(g.x-c.x,g.y-c.y)<.5)G.tgt=null}
+ const wasW=G.W;G.W=W;G.H=H;if(G.need||wasW!=W){const r=wasW?G.cam.k/G.fitK:1,f=nxFit();if(G.need){G.cam={x:f.x,y:f.y,k:f.k}}else{G.cam.k=G.fitK*r;if(G.tgt)G.tgt=null}G.home=f;G.need=false;G.dirty=true}
+ if(!(G.alpha>.004||G.tgt||G.zt||G.drag||G.pinch||G.dirty))return;G.dirty=false;
+ nxTick();if(G.zt){const c=G.cam,q=G.zt;c.k*=Math.pow(q.k/c.k,.2);c.x=q.wx-(q.ax-W/2)/c.k;c.y=q.wy-(q.ay-H/2)/c.k;if(Math.abs(q.k/c.k-1)<.002){c.k=q.k;c.x=q.wx-(q.ax-W/2)/c.k;c.y=q.wy-(q.ay-H/2)/c.k;G.zt=null}}
+ if(G.tgt){const c=G.cam,g=G.tgt,e=.16;c.x+=(g.x-c.x)*e;c.y+=(g.y-c.y)*e;c.k*=Math.pow(g.k/c.k,e);if(Math.abs(g.k/c.k-1)<.002&&Math.hypot(g.x-c.x,g.y-c.y)<.5)G.tgt=null}
  G.frame=(G.frame||0)+1;const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);const T=TH(),F="'Plus Jakarta Sans',Inter,system-ui,sans-serif",k=G.cam.k,z=zRel();
  const N=G.nodes;N.forEach(nxPos);
- const hv=G.hover,nb=new Set();if(hv){nb.add(hv);if(hv.parent)nb.add(hv.parent);hv.kids.forEach(c=>nb.add(c))}
- const dimA=n=>hv?(nb.has(n)?1:.18):1;
+ if(G.hover)G.hvN=G.hover;G.hvT=(G.hvT||0)+((G.hover?1:0)-(G.hvT||0))*.22;if(Math.abs((G.hover?1:0)-G.hvT)>.01)G.dirty=true;else if(!G.hover)G.hvN=null;
+ const hv=G.hvN,ht=G.hvT,nb=new Set();if(hv){nb.add(hv);if(hv.parent)nb.add(hv.parent);hv.kids.forEach(c=>nb.add(c))}
+ const dimA=n=>hv&&!nb.has(n)?1-.62*ht:1;
+ const vis=n=>n.d<=1?1:sst(.15,.85,n.op),colOf=n=>n.parent&&n.d>1?mixC(n.parent.c,n.c,sst(.5,1,n.op)):n.c;
  // Linien
  x.lineWidth=1;N.forEach(n=>{if(!n.parent||n.op<.02)return;const[a,b]=toS(n.parent.px,n.parent.py),[c,d]=toS(n.px,n.py);const lit=hv&&(n===hv||n.parent===hv);
-  x.strokeStyle=lit?hexA(n.c,.85):hexA(T.br,(n.d==1?.55:.42)*Math.min(dimA(n),dimA(n.parent))*n.op);x.lineWidth=lit?1.6:1;x.beginPath();x.moveTo(a,b);x.lineTo(c,d);x.stroke()});
+  x.strokeStyle=lit?hexA(colOf(n),.35+.5*ht):hexA(T.br,(n.d==1?.55:.42)*Math.min(dimA(n),dimA(n.parent))*vis(n));x.lineWidth=lit?1+.6*ht:1;x.beginPath();x.moveTo(a,b);x.lineTo(c,d);x.stroke()});
  // Punkte
  G.hits=[];const order=[...N].sort((a,b)=>b.d-a.d),boxes=[];
- order.forEach(n=>{if(n.op<.05||n.d==0)return;const[sx,sy]=toS(n.px,n.py);if(sx<-60||sy<-60||sx>W+60||sy>H+60)return;
-  const r=Math.max(n.d==3?2.6:4,nxR(n)*Math.pow(k,.75)*(n===hv?1.25:1)),al=n.op*dimA(n);
-  const g=x.createRadialGradient(sx,sy,0,sx,sy,r*3);g.addColorStop(0,hexA(n.c,.28*al));g.addColorStop(1,hexA(n.c,0));x.fillStyle=g;x.beginPath();x.arc(sx,sy,r*3,0,7);x.fill();
-  x.fillStyle=hexA(n.c,al);x.beginPath();x.arc(sx,sy,r,0,7);x.fill();
+ order.forEach(n=>{if(vis(n)<.03||n.d==0)return;const[sx,sy]=toS(n.px,n.py);if(sx<-60||sy<-60||sx>W+60||sy>H+60)return;
+  const r=Math.max(n.d==3?2.6:4,nxR(n)*Math.pow(k,.75)*(n===hv?1.25:1)),al=vis(n)*dimA(n),nc=colOf(n);
+  const g=x.createRadialGradient(sx,sy,0,sx,sy,r*3);g.addColorStop(0,hexA(nc,.28*al));g.addColorStop(1,hexA(nc,0));x.fillStyle=g;x.beginPath();x.arc(sx,sy,r*3,0,7);x.fill();
+  x.fillStyle=hexA(nc,al);x.beginPath();x.arc(sx,sy,r,0,7);x.fill();
   if(n.d<3){x.strokeStyle=hexA('#ffffff',.25*al);x.lineWidth=1;x.beginPath();x.arc(sx,sy,r,0,7);x.stroke()}
   if(n.op>.6)G.hits.push({n,x:sx,y:sy,r:Math.max(r+5,n.d==3?11:16)});
   // Beschriftung
-  const showL=n.d==1?1:n.d==2?sst(.55,.9,n.op):Math.max(sst(.75,1,n.op)*(n.parent.d==1?sst(1.9,2.5,z):sst(2.8,3.6,z)),n===hv?1:0);
-  const la=Math.min(1,showL)*(hv&&!nb.has(n)?.15:1);if(la<.03)return;
+  const showL=n.d==1?1:n.d==2?sst(.55,.9,n.op):Math.max(sst(.75,1,n.op)*(n.parent.d==1?sst(1.6,1.95,z):sst(2.2,2.6,z)),n===hv?1:0);
+  const la=Math.min(1,showL)*dimA(n)*(n.d>1?vis(n):1);if(la<.03)return;
   const fs=n.d==1?(SM?12:13.5):n.d==2?(SM?11:12):(SM?10.5:11.5);x.globalAlpha=la;x.textAlign='center';x.textBaseline='top';
   let tt=String(n.n||'');const mx=n===hv?48:n.d==3?26:30;if(tt.length>mx)tt=tt.slice(0,mx-1)+'…';
   x.font=`${n.d==1?800:n.d==2?700:500} ${fs}px ${F}`;const bw=x.measureText(tt).width,bx={l:sx-bw/2-3,r:sx+bw/2+3,t:sy+r+4,b:sy+r+6+fs*2.2};if(n.d==3&&n!==hv&&boxes.some(q=>q.l<bx.r&&q.r>bx.l&&q.t<bx.b&&q.b>bx.t)){x.globalAlpha=1;return}boxes.push(bx);x.fillStyle=n.d==3?hexA(T.tx,.86):T.tx;x.fillText(tt,sx,sy+r+5);
-  const showS=n.d==1?(1-sst(.3,.9,n.kids.length?n.kids[0].op:0))*.9+.1:n.d==2?1-sst(.4,.9,n.kids.length?n.kids[0].op:0):n===hv?1:sst(5,6.5,z)*sst(.75,1,n.op);
+  const showS=n.d==1?(1-sst(.3,.9,n.kids.length?n.kids[0].op:0))*.9+.1:n.d==2?1-sst(.4,.9,n.kids.length?n.kids[0].op:0):n===hv?1:sst(3.4,4,z)*sst(.75,1,n.op);
   if(n.s&&showS>.05){x.globalAlpha=la*showS;x.font=`600 ${fs-1.5}px ${F}`;x.fillStyle=n.c;let ss=String(n.s);if(ss.length>34)ss=ss.slice(0,33)+'…';x.fillText(ss,sx,sy+r+5+fs+3)}
   x.globalAlpha=1});
  // Mitte: Life Score
- {const n=G.by.root,[sx,sy]=toS(0,0),cr=Math.max(16,24*Math.pow(k,.75)),sc=score(),al=hv&&!nb.has(n)?.3:1;x.globalAlpha=al;
+ {const n=G.by.root,[sx,sy]=toS(0,0),cr=Math.max(16,24*Math.pow(k,.75)),sc=score(),al=dimA(n);x.globalAlpha=al;
   const cg=x.createRadialGradient(sx,sy,0,sx,sy,cr*2.4);cg.addColorStop(0,hexA(T.amb,.16));cg.addColorStop(1,hexA(T.amb,0));x.fillStyle=cg;x.beginPath();x.arc(sx,sy,cr*2.4,0,7);x.fill();
   x.fillStyle=T.panel;x.beginPath();x.arc(sx,sy,cr,0,7);x.fill();x.strokeStyle=hexA(T.amb,.18);x.lineWidth=3;x.beginPath();x.arc(sx,sy,cr+3,0,7);x.stroke();
   x.strokeStyle=T.amb;x.lineWidth=3;x.beginPath();x.arc(sx,sy,cr+3,-Math.PI/2,-Math.PI/2+Math.max(.02,sc/100)*6.283);x.stroke();
   x.fillStyle=T.amb;x.textAlign='center';x.textBaseline='middle';x.font=`800 ${Math.round(cr*.78)}px ${F}`;x.fillText(sc,sx,sy-cr*.1);x.fillStyle=hexA(T.mu,1);x.font=`700 ${Math.max(7,Math.round(cr*.22))}px ${F}`;x.fillText('SCORE',sx,sy+cr*.42);x.globalAlpha=1;
   G.hits.push({n,x:sx,y:sy,r:cr+6})}
  // Anzeige: Zoom-Stufe
- const lv=z<1.2?0:z<2.6?1:2,el=$('nxlvl');if(el&&el.dataset.l!=lv){el.dataset.l=lv;el.innerHTML=['<b>Übersicht</b> · reinzoomen für mehr','<b>Bereiche</b> · weiter reinzoomen für Einzelpunkte','<b>Details</b> · Punkt antippen zum Öffnen'][lv]}
+ const lv=z<1.15?0:z<1.9?1:2,el=$('nxlvl');if(el&&el.dataset.l!=lv){el.dataset.l=lv;el.innerHTML=['<b>Übersicht</b> · reinzoomen für mehr','<b>Bereiche</b> · weiter reinzoomen für Einzelpunkte','<b>Details</b> · Punkt antippen zum Öffnen'][lv]}
  if(G.drag&&!G.drag.n)cv.style.cursor='grabbing'}
 requestAnimationFrame(nxFrame);
 function nxHit(mx,my){let best=null,bd=1e9;(G.hits||[]).forEach(h=>{const d=Math.hypot(h.x-mx,h.y-my);if(d<h.r&&d<bd){bd=d;best=h.n}});return best}
-function nxZoomAt(sx,sy,f){const[wx,wy]=toW(sx,sy),k=Math.max(G.fitK*.6,Math.min(G.fitK*9,G.cam.k*f));G.cam.k=k;G.cam.x=wx-(sx-G.W/2)/k;G.cam.y=wy-(sy-G.H/2)/k;G.tgt=null;G.dirty=true}
+function nxZoomAt(sx,sy,f){G.zt=null;const[wx,wy]=toW(sx,sy),k=Math.max(G.fitK*.7,Math.min(KMAX(),G.cam.k*f));G.cam.k=k;G.cam.x=wx-(sx-G.W/2)/k;G.cam.y=wy-(sy-G.H/2)/k;G.tgt=null;G.dirty=true}
 function nxClick(n){if(!n)return;if(n.act.fit){const h=nxFit();nxGo(h.x,h.y,h.k);return}
  if(n.act.go){n.act.go();return}
- const p=nxPos(n),hasLeaves=n.kids.some(c=>c.d==3),want=n.d==1?(hasLeaves?2.7:1.9):3.9;nxGo(p.x,p.y,G.fitK*Math.max(want,zRel()))}
+ const p=nxPos(n),hasLeaves=n.kids.some(c=>c.d==3),SMW=G.W<560,want=n.d==1?(hasLeaves?(SMW?2:2.5):(SMW?1.5:1.75)):(SMW?2.7:3.3);nxGo(p.x,p.y,KREF*Math.max(want,zRel()))}
 function bindNexus(){const cv=$('nexus');if(!cv)return;G.hover=null;G.dirty=true;try{nxSync()}catch(e){console.error('Nexus',e)}
  const pos=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
  cv.onpointerdown=e=>{const[mx,my]=pos(e);G.ptr.set(e.pointerId,[mx,my]);try{cv.setPointerCapture(e.pointerId)}catch(_){}
   if(G.ptr.size==2){const[a,b]=[...G.ptr.values()];G.pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]),m:[(a[0]+b[0])/2,(a[1]+b[1])/2]};G.drag=null;G.moved=true;return}
-  const n=nxHit(mx,my),dn=n&&n.d>0?n:null;G.drag={n:dn,nx:dn?dn.x:null,ny:dn?dn.y:null,sx:mx,sy:my,cx:G.cam.x,cy:G.cam.y};G.moved=false;G.tap=false};
+  G.zt=null;const n=nxHit(mx,my),dn=n&&n.d>0?n:null;G.drag={n:dn,nx:dn?dn.x:null,ny:dn?dn.y:null,sx:mx,sy:my,cx:G.cam.x,cy:G.cam.y};G.moved=false;G.tap=false};
  cv.onpointermove=e=>{const[mx,my]=pos(e);if(G.ptr.has(e.pointerId))G.ptr.set(e.pointerId,[mx,my]);
   if(G.pinch&&G.ptr.size==2){const[a,b]=[...G.ptr.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]),m=[(a[0]+b[0])/2,(a[1]+b[1])/2];nxZoomAt(m[0],m[1],d/G.pinch.d);
    G.cam.x-=(m[0]-G.pinch.m[0])/G.cam.k;G.cam.y-=(m[1]-G.pinch.m[1])/G.cam.k;G.pinch={d,m};return}
   const D0=G.drag;if(D0){if(!G.moved&&Math.hypot(mx-D0.sx,my-D0.sy)>5)G.moved=true;
    if(G.moved){if(D0.n){const[wx,wy]=toW(mx,my),p=D0.n,dx=wx-p.px,dy=wy-p.py;p.x+=dx;p.y+=dy;G.alpha=Math.max(G.alpha,.3)}else{G.cam.x=D0.cx-(mx-D0.sx)/G.cam.k;G.cam.y=D0.cy-(my-D0.sy)/G.cam.k;G.tgt=null}}return}
-  if(e.pointerType=='mouse'){const h=nxHit(mx,my);if(h!==G.hover){G.hover=h;G.dirty=true}cv.style.cursor=h?'pointer':'grab'}};
+  if(e.pointerType=='mouse'){const h=performance.now()-(G.wheelT||0)<350?null:nxHit(mx,my);if(h!==G.hover){G.hover=h;G.dirty=true}cv.style.cursor=h?'pointer':'grab'}};
  const up=e=>{G.ptr.delete(e.pointerId);if(G.pinch){if(G.ptr.size<2)G.pinch=null;G.drag=null;return}
   const D0=G.drag;G.drag=null;G.dirty=true;if(e.type=='pointercancel'&&D0){if(D0.n&&D0.nx!=null){D0.n.x=D0.nx;D0.n.y=D0.ny}else{G.cam.x=D0.cx;G.cam.y=D0.cy}G.tap=false;return}
   G.tap=e.type=='pointerup'&&D0&&!G.moved;if(D0&&D0.n&&G.moved)G.alpha=Math.max(G.alpha,.25)};
  cv.onclick=e=>{if(!G.tap)return;G.tap=false;const[mx,my]=pos(e);nxClick(nxHit(mx,my))};
  cv.onpointerup=up;cv.onpointercancel=up;cv.onpointerleave=e=>{if(e.pointerType=='mouse'&&!G.drag){G.hover=null;G.dirty=true}};
- cv.onwheel=e=>{const f=Math.exp(-e.deltaY*(e.ctrlKey?.01:.0016)),k=G.cam.k;if((f>1&&k>=G.fitK*9*.999)||(f<1&&k<=G.fitK*.6*1.001))return;e.preventDefault();const[mx,my]=pos(e);nxZoomAt(mx,my,f)};
+ cv.onwheel=e=>{G.wheelT=performance.now();if(G.hover){G.hover=null;G.dirty=true}const f=Math.exp(-Math.max(-160,Math.min(160,e.deltaY))*(e.ctrlKey?.008:.0011)),k=G.zt?G.zt.k:G.cam.k;if((f>1&&k>=KMAX()*.999)||(f<1&&k<=G.fitK*.7*1.001))return;e.preventDefault();const[mx,my]=pos(e),[wx,wy]=toW(mx,my);G.tgt=null;G.zt={k:Math.max(G.fitK*.7,Math.min(KMAX(),k*f)),ax:mx,ay:my,wx,wy};G.dirty=true};
  cv.ondblclick=e=>{const[mx,my]=pos(e);if(!nxHit(mx,my)){const h=nxFit();nxGo(h.x,h.y,h.k)}};
  document.querySelectorAll('[data-nz]').forEach(b=>b.onclick=()=>{const z=b.dataset.nz;if(z=='fit'){const h=nxFit();nxGo(h.x,h.y,h.k)}else{const f=z=='in'?1.4:1/1.4;nxGo(G.cam.x,G.cam.y,G.cam.k*f)}});
 }
