@@ -250,6 +250,7 @@ input,select,textarea{font-family:var(--sans);border-radius:10px;background:var(
 .greet{display:none}
 .fhero{border-radius:var(--r);background:radial-gradient(420px 220px at 90% 0%,rgba(var(--cyRGB),.14),transparent 70%),var(--panel)}.fhero .big{font-family:var(--sans);font-weight:800;letter-spacing:-1px}
 .tabbar{display:none}
+.ver{text-align:center;font-size:10.5px;color:var(--mu);margin:26px 0 6px;opacity:.7}
 .snav,.tabbar{flex:none;overflow:visible;gap:2px}.snav a,.tabbar a{font-family:var(--sans);text-transform:none;letter-spacing:0}.hint{font-family:var(--sans);letter-spacing:0}
 .psug{border-radius:12px;top:calc(100% + 6px)}
 @media(max-width:1180px){.srch kbd{display:none}.gpill span{max-width:120px}}
@@ -284,13 +285,13 @@ input,select,textarea{font-family:var(--sans);border-radius:10px;background:var(
 <div id="gate" style="display:none"><div class="box"><img src="icon-192.png" alt=""><h1>Life <em>OS</em></h1>
 <p>Melde dich mit deinem Google-Konto an. Danach holt die App alles aus deinem Kevin-Vault und hält es dort aktuell.</p>
 <button id="gbtn">Mit Google verbinden</button><small id="gmsg"></small></div></div>
-<script src="config.js?v=10"></script>
-<script src="sync.js?v=10"></script>
+<script src="config.js?v=14"></script>
+<script src="sync.js?v=14"></script>
 <script>
 (function(){
-  if('serviceWorker' in navigator) addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  if('serviceWorker' in navigator){var hadSW=!!navigator.serviceWorker.controller,rl=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(hadSW&&!rl){rl=true;location.reload()}});addEventListener('load',()=>navigator.serviceWorker.register('sw.js').then(function(r){r.update&&r.update()}).catch(()=>{}));document.addEventListener('visibilitychange',function(){if(document.visibilityState=='visible')navigator.serviceWorker.getRegistration().then(function(r){r&&r.update()})})}
   function start(){if(LOS.started)return;LOS.started=true;document.getElementById('gate').style.display='none';
-    var s=document.createElement('script');s.src="app.js?v=10";s.onload=function(){Promise.resolve(LOS.sync({mails:true})).catch(function(){}).finally(function(){window.migrateSkin&&migrateSkin()})};document.body.appendChild(s)}
+    var s=document.createElement('script');s.src="app.js?v=14";s.onload=function(){Promise.resolve(LOS.sync({mails:true})).catch(function(){}).finally(function(){window.migrateSkin&&migrateSkin()})};document.body.appendChild(s)}
   if(LOS.trySilent&&LOS.trySilent())return;
   if(LOS.data){start();return}
   var g=document.getElementById('gate'),m=document.getElementById('gmsg');g.style.display='flex';

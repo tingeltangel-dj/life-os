@@ -43,6 +43,7 @@ const fsum=l=>l.filter(active).reduce((a,x)=>a+(+x.b||0),0);
 function ftot(){const F=D.fin,e=fsum(F.einnahmen),a=fsum(F.monat),j=fsum(F.jaehrlich)/12;return{e,a,j,r:e-a-j}}
 let ftab='monat';
 
+const APPV='14 (26.11. 13:40)';
 const IC={start:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
  todos:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>',
  kalender:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
@@ -79,7 +80,7 @@ function render(){
   :`<div class="srch"><i>${IC.search}</i><input id="qi" placeholder="Eintragen: Termin, To-do oder Idee …" autocomplete="off"><kbd>Strg K</kbd><button class="btn w s" id="qb">Capture</button></div>`}
  ${nx?`<a class="gpill" href="#kalender" title="${esc(nx.t)}"><i></i><span>${gigName}</span><em>${days(nx.d)} T.</em></a>`:''}
  <button class="sync" id="cld">${LOS.badge()}</button><button class="ava" id="dsg" title="Design & Farben">KE</button></header>
- ${hero}<div id="v" class="mt"></div></div>
+ ${hero}<div id="v" class="mt"></div><div class="ver">Life OS · Version ${APPV}</div></div>
  <nav class="tabbar">${views.map(v=>`<a href="#${v[0]}" class="${cur==v[0]?'on':''}"><i>${IC[v[0]]}</i><span>${v[1]}</span></a>`).join('')}</nav>`;
  $('dsg').onclick=designSheet;$('sdsg').onclick=designSheet;$('cld').onclick=()=>LOS.panel();$('scld').onclick=()=>LOS.panel();$('sshift').onclick=()=>{location.hash='#kalender'};
  if($('hrev'))$('hrev').onclick=reviewSheet;if($('hcap'))$('hcap').onclick=()=>{$('qi').focus()};
@@ -264,9 +265,10 @@ function nxZoomAt(sx,sy,f){G.zt=null;const[wx,wy]=toW(sx,sy),k=Math.max(G.fitK*.
 function nxClick(n){if(!n)return;if(n.act.fit){const h=nxFit();nxGo(h.x,h.y,h.k);return}
  if(n.act.go){n.act.go();return}
  const p=nxPos(n),hasLeaves=n.kids.some(c=>c.d==3),SMW=G.W<560,want=n.d==1?(hasLeaves?(SMW?2:2.5):(SMW?1.5:1.75)):(SMW?2.7:3.3);nxGo(p.x,p.y,KREF*Math.max(want,zRel()))}
-function bindNexus(){const cv=$('nexus');if(!cv)return;G.hover=null;G.dirty=true;try{nxSync()}catch(e){console.error('Nexus',e)}
+function nxFlush(){if(G.pendR&&!G.ptr.size&&!G.drag&&!G.pinch){G.pendR=false;setTimeout(()=>{if(!$('ov').classList.contains('on')){applyTheme();render()}else G.pendR=true},60)}}
+function bindNexus(){const cv=$('nexus');if(!cv)return;G.hover=null;G.ptr.clear();G.drag=null;G.pinch=null;G.dirty=true;try{nxSync()}catch(e){console.error('Nexus',e)}
  const pos=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
- cv.onpointerdown=e=>{const[mx,my]=pos(e);G.ptr.set(e.pointerId,[mx,my]);try{cv.setPointerCapture(e.pointerId)}catch(_){}
+ cv.onpointerdown=e=>{const[mx,my]=pos(e);if(e.isPrimary||e.pointerType=='mouse'){G.ptr.clear();G.pinch=null}if(e.pointerType!='mouse')e.preventDefault();G.ptr.set(e.pointerId,[mx,my]);try{cv.setPointerCapture(e.pointerId)}catch(_){}
   if(G.ptr.size==2){const[a,b]=[...G.ptr.values()];G.pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]),m:[(a[0]+b[0])/2,(a[1]+b[1])/2]};G.drag=null;G.moved=true;return}
   G.zt=null;const n=nxHit(mx,my),dn=n&&n.d>0&&e.pointerType=='mouse'?n:null;G.drag={n:dn,nx:dn?dn.x:null,ny:dn?dn.y:null,sx:mx,sy:my,cx:G.cam.x,cy:G.cam.y};G.moved=false;G.tap=false};
  cv.onpointermove=e=>{const[mx,my]=pos(e);if(G.ptr.has(e.pointerId))G.ptr.set(e.pointerId,[mx,my]);
@@ -275,11 +277,13 @@ function bindNexus(){const cv=$('nexus');if(!cv)return;G.hover=null;G.dirty=true
   const D0=G.drag;if(D0){if(!G.moved&&Math.hypot(mx-D0.sx,my-D0.sy)>5)G.moved=true;
    if(G.moved){if(D0.n){const[wx,wy]=toW(mx,my),p=D0.n,dx=wx-p.px,dy=wy-p.py;p.x+=dx;p.y+=dy;G.alpha=Math.max(G.alpha,.3)}else{G.cam.x=D0.cx-(mx-D0.sx)/G.cam.k;G.cam.y=D0.cy-(my-D0.sy)/G.cam.k;G.tgt=null}}return}
   if(e.pointerType=='mouse'){const h=performance.now()-(G.wheelT||0)<350?null:nxHit(mx,my);if(h!==G.hover){G.hover=h;G.dirty=true}cv.style.cursor=h?'pointer':'grab'}};
- const up=e=>{G.ptr.delete(e.pointerId);if(G.pinch){if(G.ptr.size<2)G.pinch=null;G.drag=null;return}
-  const D0=G.drag;G.drag=null;G.dirty=true;if(e.type=='pointercancel'&&D0){if(D0.n&&D0.nx!=null){D0.n.x=D0.nx;D0.n.y=D0.ny}else{G.cam.x=D0.cx;G.cam.y=D0.cy}G.tap=false;return}
-  G.tap=e.type=='pointerup'&&D0&&!G.moved;if(D0&&D0.n&&G.moved)G.alpha=Math.max(G.alpha,.25)};
+ const up=e=>{if(!G.ptr.has(e.pointerId)&&!G.drag)return;G.ptr.delete(e.pointerId);G.dirty=true;
+  if(G.pinch){G.pinch=null;G.drag=null;if(G.ptr.size==1){const[r]=[...G.ptr.values()];G.drag={n:null,sx:r[0],sy:r[1],cx:G.cam.x,cy:G.cam.y};G.moved=true}else if(G.ptr.size>=2){const[a,b]=[...G.ptr.values()];G.pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]),m:[(a[0]+b[0])/2,(a[1]+b[1])/2]}}G.tap=false;nxFlush();return}
+  if(G.ptr.size)return;const D0=G.drag;G.drag=null;if(e.type!='pointerup'){G.tap=false;nxFlush();return}
+  G.tap=!!D0&&!G.moved;if(D0&&D0.n&&G.moved)G.alpha=Math.max(G.alpha,.25);nxFlush()};
  cv.onclick=e=>{if(!G.tap)return;G.tap=false;const[mx,my]=pos(e);nxClick(nxHit(mx,my))};
- cv.onpointerup=up;cv.onpointercancel=up;cv.onpointerleave=e=>{if(e.pointerType=='mouse'&&!G.drag){G.hover=null;G.dirty=true}};
+ if(!cv._tm){cv._tm=1;cv.addEventListener('touchmove',e=>{e.preventDefault()},{passive:false})}
+ cv.onpointerup=up;cv.onpointercancel=up;cv.onlostpointercapture=up;cv.onpointerleave=e=>{if(e.pointerType=='mouse'&&!G.drag){G.hover=null;G.dirty=true}};
  cv.onwheel=e=>{G.wheelT=performance.now();if(G.hover){G.hover=null;G.dirty=true}const f=Math.exp(-Math.max(-160,Math.min(160,e.deltaY))*(e.ctrlKey?.008:.0011)),k=G.zt?G.zt.k:G.cam.k;e.preventDefault();if((f>1&&k>=KMAX()*.999)||(f<1&&k<=G.fitK*.7*1.001))return;const[mx,my]=pos(e),[wx,wy]=toW(mx,my);G.tgt=null;G.zt={k:Math.max(G.fitK*.7,Math.min(KMAX(),k*f)),ax:mx,ay:my,wx,wy};G.dirty=true};
  cv.ondblclick=e=>{const[mx,my]=pos(e);if(!nxHit(mx,my)){const h=nxFit();nxGo(h.x,h.y,h.k)}};
  document.querySelectorAll('[data-nz]').forEach(b=>b.onclick=()=>{const z=b.dataset.nz;if(z=='fit'){const h=nxFit();nxGo(h.x,h.y,h.k)}else{const f=z=='in'?1.4:1/1.4;nxGo(G.cam.x,G.cam.y,G.cam.k*f)}});
@@ -681,4 +685,4 @@ function lifeMarkdown(){
  return {'Life OS – Übersicht.md':u,'To-dos.md':t,'Projekte.md':p,'Kalender.md':k,'Check-in-Protokoll.md':l};
 }
 /* ---------- Anbindung an Sync-Modul ---------- */
-LOS.hooks={render:()=>{applyTheme();render()},sheet,close,capture:(t)=>capture(t),busy:()=>$('ov').classList.contains('on'),markdown:()=>lifeMarkdown()};
+LOS.hooks={render:()=>{if(G.ptr.size||G.drag||G.pinch){G.pendR=true;return}applyTheme();render()},sheet,close,capture:(t)=>capture(t),busy:()=>$('ov').classList.contains('on'),markdown:()=>lifeMarkdown()};
